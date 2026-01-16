@@ -1,0 +1,45 @@
+---
+config:
+  default_user: ubuntu
+  users:
+    - name: ubuntu
+      ssh_keys:
+        - /Users/alexeiev/workspace/proxmox/keys_ssh/proxmox
+        - ~/workspace/proxmox/keys_ssh/proxmox
+        #- ~/.ssh/id_ed25519
+    - name: devops
+      ssh_keys:
+        - ~/.ssh/id_rsa
+  jump_hosts: jump.example.com
+
+hosts:
+  - name: dns
+    host: 192.168.1.31
+    port: 22
+  - name: traefik
+    host: 192.168.1.32
+    port: 22
+  - name: swarm-01
+    host: 100.64.1.10
+    user: alexeiev
+    port: 22
+  - name: swarm-02
+    host: 100.64.1.11
+    user: alexeiev
+    port: 22
+  - name: swarm-03
+    host: 100.64.1.12
+    user: alexeiev
+    port: 22
+  - name: swarm-04
+    host: 100.64.1.13
+    user: alexeiev
+    port: 22
+  - name: swarm-05
+    host: 100.64.1.14
+    user: alexeiev
+    port: 22
+  - name: swarm-06
+    host: 100.64.1.15
+    user: alexeiev
+    port: 22    
