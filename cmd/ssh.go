@@ -59,6 +59,11 @@ func (s *SSHConnection) Connect() error {
 
 // createSSHConfig cria a configuração do cliente SSH
 func (s *SSHConnection) createSSHConfig() (*ssh.ClientConfig, error) {
+	return s.createSSHConfigWithContext(fmt.Sprintf("%s@%s:%d", s.User, s.Host, s.Port))
+}
+
+// createSSHConfigWithContext cria a configuração do cliente SSH com contexto para prompts
+func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientConfig, error) {
 	authMethods := []ssh.AuthMethod{}
 
 	// Adiciona autenticação por chave SSH se especificada
@@ -81,18 +86,17 @@ func (s *SSHConnection) createSSHConfig() (*ssh.ClientConfig, error) {
 		authMethods = append(authMethods, agentAuth)
 	}
 
-	// Se não há métodos de autenticação, tenta senha interativa
-	if len(authMethods) == 0 {
-		authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-			fmt.Print("Password: ")
-			password, err := term.ReadPassword(int(os.Stdin.Fd()))
-			fmt.Println()
-			if err != nil {
-				return "", err
-			}
-			return string(password), nil
-		}))
-	}
+	// Sempre adiciona senha interativa como fallback final
+	// Será solicitada apenas se todos os métodos anteriores falharem
+	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
+		fmt.Printf("Password for %s: ", context)
+		password, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			return "", err
+		}
+		return string(password), nil
+	}))
 
 	config := &ssh.ClientConfig{
 		User:            s.User,
@@ -112,11 +116,10 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 		return ssh.Dial("tcp", address, config)
 	}
 
-	// Conexão via Jump Host
-	jumpConfig := &ssh.ClientConfig{
-		User:            config.User,
-		Auth:            config.Auth,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	// Cria configuração separada para Jump Host com contexto claro
+	jumpConfig, err := s.createSSHConfigWithContext(fmt.Sprintf("%s@%s (Jump Host)", s.User, s.JumpHost))
+	if err != nil {
+		return nil, fmt.Errorf("erro ao criar configuração para Jump Host: %w", err)
 	}
 
 	// Conecta ao Jump Host (assume porta 22)
@@ -132,7 +135,7 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 		return nil, fmt.Errorf("erro ao conectar ao host através do Jump Host: %w", err)
 	}
 
-	// Cria o cliente SSH sobre a conexão do Jump Host
+	// Cria o cliente SSH sobre a conexão do Jump Host (com config do target)
 	ncc, chans, reqs, err := ssh.NewClientConn(conn, address, config)
 	if err != nil {
 		conn.Close()

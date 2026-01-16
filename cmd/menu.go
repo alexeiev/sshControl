@@ -120,7 +120,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, useJumpH
 
 	// Cria a lista
 	l := list.New(items, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "SSH Manager - Selecione um host"
+	l.Title = "SSH Control - Selecione um host"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 
