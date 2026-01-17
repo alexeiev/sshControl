@@ -170,3 +170,26 @@ func ParseConnectionString(input string) (user, host string, port int, err error
 	}
 	return h.parsedUser, h.hostname, h.port, nil
 }
+
+// ListServers exibe todos os servidores cadastrados no config
+func ListServers(cfg *config.ConfigFile) {
+	if len(cfg.Hosts) == 0 {
+		fmt.Println("Nenhum servidor cadastrado no config.yaml")
+		return
+	}
+
+	fmt.Println()
+	fmt.Println("📋 Servidores cadastrados:")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("%-20s %s\n", "Nome", "Host:Porta")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	for _, host := range cfg.Hosts {
+		hostPort := fmt.Sprintf("%s:%d", host.Host, host.Port)
+		fmt.Printf("%-20s %s\n", host.Name, hostPort)
+	}
+
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("Total: %d servidor(es)\n", len(cfg.Hosts))
+	fmt.Println()
+}

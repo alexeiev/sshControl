@@ -12,9 +12,10 @@ import (
 func main() {
 	// Define as flags
 	username := flag.String("u", "", "Nome do usuário da configuração a ser usado")
-	useJumpHost := flag.Bool("s", false, "Habilita conexão via Jump Host")
+	useJumpHost := flag.Bool("j", false, "Habilita conexão via Jump Host")
 	command := flag.String("c", "", "Comando a ser executado remotamente")
 	multipleHosts := flag.Bool("l", false, "Executa comando em múltiplos hosts (requer -c)")
+	showServers := flag.Bool("s", false, "Lista todos os servidores cadastrados no config")
 	flag.Parse()
 
 	// Inicializa o diretório de configuração e obtém o caminho do arquivo
@@ -32,10 +33,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Se a flag -s foi usada, lista os servidores e sai
+	if *showServers {
+		cmd.ListServers(cfg)
+		return
+	}
+
 	// Valida o Jump Host se solicitado
 	if *useJumpHost && cfg.Config.JumpHosts == "" {
 		fmt.Fprintf(os.Stderr, "Aviso: Jump Host solicitado mas não configurado no config.yaml\n")
-		fmt.Fprintf(os.Stderr, "A opção -s será ignorada.\n\n")
+		fmt.Fprintf(os.Stderr, "A opção -j será ignorada.\n\n")
 		*useJumpHost = false
 	}
 

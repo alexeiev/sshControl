@@ -23,6 +23,12 @@ go run .
 
 ## Exemplos de Uso
 
+### Listagem de Servidores
+```bash
+# Lista todos os servidores cadastrados no config.yaml
+sc -s
+```
+
 ### Modo Interativo (TUI)
 ```bash
 # Abre menu interativo para selecionar host
@@ -32,7 +38,7 @@ sc
 sc -u ubuntu
 
 # Menu interativo com jump host habilitado
-sc -s
+sc -j
 ```
 
 ### Modo Direto (Sessão Interativa)
@@ -47,7 +53,7 @@ sc 192.168.1.50
 sc ubuntu@192.168.1.50:2222
 
 # Conecta via jump host
-sc -s production-db
+sc -j production-db
 ```
 
 ### Execução de Comando Remoto (Host Único)
@@ -62,7 +68,7 @@ sc -c "df -h" 192.168.1.50
 sc -u deploy -c "systemctl status nginx" webserver
 
 # Executa comando via jump host
-sc -s -c "cat /var/log/app.log" production-app
+sc -j -c "cat /var/log/app.log" production-app
 ```
 
 ### Execução de Comando em Múltiplos Hosts
@@ -77,7 +83,7 @@ sc -c "free -h" -l 192.168.1.10 192.168.1.11 192.168.1.12
 sc -c "hostname" -l web1 192.168.1.50 ubuntu@192.168.1.51
 
 # Executa em múltiplos hosts via jump host
-sc -s -c "df -h" -l db1 db2 db3
+sc -j -c "df -h" -l db1 db2 db3
 
 # Com usuário específico
 sc -u admin -c "systemctl status nginx" -l web1 web2 web3
@@ -99,9 +105,10 @@ Estrutura da configuração:
 
 **main.go**: Ponto de entrada que gerencia flags CLI e roteamento:
 - `-u <username>`: Especifica qual usuário do config usar
-- `-s`: Habilita modo de conexão via jump host
+- `-j`: Habilita modo de conexão via jump host
 - `-c "<comando>"`: Executa comando remoto (requer especificar host)
 - `-l`: Executa comando em múltiplos hosts (requer `-c`)
+- `-s`: Lista todos os servidores cadastrados no config.yaml
 - Modo direto: `sc [flags] <host>` conecta imediatamente
 - Modo múltiplos hosts: `sc -c "comando" -l <host1> <host2> ...` executa comando em paralelo
 - Modo interativo: `sc [flags]` exibe menu TUI
@@ -116,7 +123,7 @@ Estrutura da configuração:
   - Implementa conexões proxy via jump host
   - Gerencia sessões PTY interativas com suporte a redimensionamento de terminal
   - Métodos `Connect()` para sessão interativa e `ExecuteCommand()` para execução de comandos remotos
-- `direct.go`: Analisa strings de conexão direta (suporta formatos como `user@host:port`, `host`, etc.)
+- `direct.go`: Analisa strings de conexão direta (suporta formatos como `user@host:port`, `host`, etc.) e implementa função `ListServers()` para exibir servidores cadastrados
 - `menu.go`: Implementação TUI com Bubble Tea para seleção interativa de hosts com filtragem
 - `multiple.go`: Gerencia execução paralela de comandos em múltiplos hosts
   - Usa goroutines e sync.WaitGroup para execução concorrente
