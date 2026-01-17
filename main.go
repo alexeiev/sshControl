@@ -14,6 +14,7 @@ func main() {
 	username := flag.String("u", "", "Nome do usuário da configuração a ser usado")
 	useJumpHost := flag.Bool("s", false, "Habilita conexão via Jump Host")
 	command := flag.String("c", "", "Comando a ser executado remotamente")
+	multipleHosts := flag.Bool("l", false, "Executa comando em múltiplos hosts (requer -c)")
 	flag.Parse()
 
 	// Inicializa o diretório de configuração e obtém o caminho do arquivo
@@ -60,6 +61,24 @@ func main() {
 
 	// Pega os argumentos restantes após as flags
 	args := flag.Args()
+
+	// Validação: -l requer -c
+	if *multipleHosts && *command == "" {
+		fmt.Fprintf(os.Stderr, "Erro: A opção -l requer especificar um comando com -c\n")
+		fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
+		os.Exit(1)
+	}
+
+	// Modo múltiplos hosts
+	if *multipleHosts {
+		if len(args) == 0 {
+			fmt.Fprintf(os.Stderr, "Erro: A opção -l requer especificar pelo menos um host\n")
+			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
+			os.Exit(1)
+		}
+		cmd.ConnectMultiple(cfg, args, selectedUser, *useJumpHost, *command)
+		return
+	}
 
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {

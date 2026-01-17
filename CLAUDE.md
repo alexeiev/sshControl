@@ -19,9 +19,68 @@ make build
 # Execução direta durante desenvolvimento
 go run .
 
-# Comandos Go padrão funcionam normalmente
-go build -o sc .
-go test ./...
+```
+
+## Exemplos de Uso
+
+### Modo Interativo (TUI)
+```bash
+# Abre menu interativo para selecionar host
+sc
+
+# Menu interativo usando usuário específico
+sc -u ubuntu
+
+# Menu interativo com jump host habilitado
+sc -s
+```
+
+### Modo Direto (Sessão Interativa)
+```bash
+# Conecta a host do config.yaml
+sc webserver
+
+# Conecta diretamente a IP
+sc 192.168.1.50
+
+# Conecta com usuário e porta específicos
+sc ubuntu@192.168.1.50:2222
+
+# Conecta via jump host
+sc -s production-db
+```
+
+### Execução de Comando Remoto (Host Único)
+```bash
+# Executa comando em host do config.yaml
+sc -c "uptime" webserver
+
+# Executa comando em IP direto
+sc -c "df -h" 192.168.1.50
+
+# Executa comando com usuário específico
+sc -u deploy -c "systemctl status nginx" webserver
+
+# Executa comando via jump host
+sc -s -c "cat /var/log/app.log" production-app
+```
+
+### Execução de Comando em Múltiplos Hosts
+```bash
+# Executa comando em múltiplos hosts do config
+sc -c "uptime" -l web1 web2 web3
+
+# Executa comando em múltiplos IPs
+sc -c "free -h" -l 192.168.1.10 192.168.1.11 192.168.1.12
+
+# Combina hosts do config e IPs diretos
+sc -c "hostname" -l web1 192.168.1.50 ubuntu@192.168.1.51
+
+# Executa em múltiplos hosts via jump host
+sc -s -c "df -h" -l db1 db2 db3
+
+# Com usuário específico
+sc -u admin -c "systemctl status nginx" -l web1 web2 web3
 ```
 
 ## Configuração
@@ -41,7 +100,10 @@ Estrutura da configuração:
 **main.go**: Ponto de entrada que gerencia flags CLI e roteamento:
 - `-u <username>`: Especifica qual usuário do config usar
 - `-s`: Habilita modo de conexão via jump host
+- `-c "<comando>"`: Executa comando remoto (requer especificar host)
+- `-l`: Executa comando em múltiplos hosts (requer `-c`)
 - Modo direto: `sc [flags] <host>` conecta imediatamente
+- Modo múltiplos hosts: `sc -c "comando" -l <host1> <host2> ...` executa comando em paralelo
 - Modo interativo: `sc [flags]` exibe menu TUI
 
 **Pacote config/**: Gerenciamento de configuração
@@ -53,8 +115,12 @@ Estrutura da configuração:
   - Gerencia autenticação com fallback automático: chave SSH → SSH agent → senha interativa
   - Implementa conexões proxy via jump host
   - Gerencia sessões PTY interativas com suporte a redimensionamento de terminal
+  - Métodos `Connect()` para sessão interativa e `ExecuteCommand()` para execução de comandos remotos
 - `direct.go`: Analisa strings de conexão direta (suporta formatos como `user@host:port`, `host`, etc.)
 - `menu.go`: Implementação TUI com Bubble Tea para seleção interativa de hosts com filtragem
+- `multiple.go`: Gerencia execução paralela de comandos em múltiplos hosts
+  - Usa goroutines e sync.WaitGroup para execução concorrente
+  - Coleta e formata resultados de forma organizada com indicadores de sucesso/falha
 
 ### Fluxo de Conexão
 
