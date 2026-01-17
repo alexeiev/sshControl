@@ -13,6 +13,7 @@ func main() {
 	// Define as flags
 	username := flag.String("u", "", "Nome do usuário da configuração a ser usado")
 	useJumpHost := flag.Bool("s", false, "Habilita conexão via Jump Host")
+	command := flag.String("c", "", "Comando a ser executado remotamente")
 	flag.Parse()
 
 	// Inicializa o diretório de configuração e obtém o caminho do arquivo
@@ -63,8 +64,15 @@ func main() {
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, hostArg, selectedUser, *useJumpHost)
+		cmd.Connect(cfg, hostArg, selectedUser, *useJumpHost, *command)
 		return
+	}
+
+	// Modo interativo não suporta execução de comando remoto
+	if *command != "" {
+		fmt.Fprintf(os.Stderr, "Erro: A opção -c requer especificar um host\n")
+		fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" <host>\n")
+		os.Exit(1)
 	}
 
 	// Modo interativo (menu)

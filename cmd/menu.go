@@ -155,6 +155,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, useJumpH
 			m.selectedSSHKey,
 			m.useJumpHost,
 			jumpHost,
+			"", // Modo interativo não executa comandos remotos
 		)
 
 		if err := sshConn.Connect(); err != nil {

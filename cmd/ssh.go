@@ -19,6 +19,7 @@ type SSHConnection struct {
 	SSHKey      string
 	JumpHost    string
 	UseJumpHost bool
+	Command     string
 }
 
 // Connect estabelece uma conexão SSH interativa
@@ -52,6 +53,50 @@ func (s *SSHConnection) Connect() error {
 	// Inicia a sessão interativa
 	if err := s.startInteractiveSession(session); err != nil {
 		return fmt.Errorf("erro na sessão interativa: %w", err)
+	}
+
+	return nil
+}
+
+// ExecuteCommand executa um comando remoto e exibe a saída
+func (s *SSHConnection) ExecuteCommand() error {
+	// Exibe a string de conexão e o comando antes de conectar
+	fmt.Println()
+	fmt.Println("🔗 Conectando...")
+	fmt.Printf("   %s\n", s.formatConnectionString())
+	fmt.Printf("   Comando: %s\n", s.Command)
+	fmt.Println()
+
+	// Cria a configuração SSH
+	config, err := s.createSSHConfig()
+	if err != nil {
+		return fmt.Errorf("erro ao criar configuração SSH: %w", err)
+	}
+
+	// Conecta ao host (via Jump Host se necessário)
+	client, err := s.dial(config)
+	if err != nil {
+		return fmt.Errorf("erro ao conectar: %w", err)
+	}
+	defer client.Close()
+
+	// Cria uma sessão SSH
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("erro ao criar sessão: %w", err)
+	}
+	defer session.Close()
+
+	// Conecta stdout e stderr à saída do terminal
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+
+	// Executa o comando
+	if err := session.Run(s.Command); err != nil {
+		if exitErr, ok := err.(*ssh.ExitError); ok {
+			return fmt.Errorf("comando encerrado com código: %d", exitErr.ExitStatus())
+		}
+		return fmt.Errorf("erro ao executar comando: %w", err)
 	}
 
 	return nil
@@ -263,7 +308,7 @@ func (s *SSHConnection) formatConnectionString() string {
 }
 
 // NewSSHConnection cria uma nova conexão SSH
-func NewSSHConnection(user, host string, port int, sshKey string, useJumpHost bool, jumpHost string) *SSHConnection {
+func NewSSHConnection(user, host string, port int, sshKey string, useJumpHost bool, jumpHost string, command string) *SSHConnection {
 	return &SSHConnection{
 		User:        user,
 		Host:        host,
@@ -271,5 +316,6 @@ func NewSSHConnection(user, host string, port int, sshKey string, useJumpHost bo
 		SSHKey:      sshKey,
 		JumpHost:    jumpHost,
 		UseJumpHost: useJumpHost,
+		Command:     command,
 	}
 }

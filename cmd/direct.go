@@ -17,7 +17,7 @@ import (
 // 3. user@host: "ubuntu@192.168.1.50" (porta 22 por padrão)
 // 4. host:port: "192.168.1.50:22" (usa usuário especificado ou default)
 // 5. host: "192.168.1.50" (usa usuário especificado ou default e porta 22)
-func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, useJumpHost bool) {
+func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, useJumpHost bool, command string) {
 	var hostname string
 	var port int
 	var sshKey string
@@ -79,9 +79,18 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 		sshKey,
 		useJumpHost,
 		jumpHost,
+		command,
 	)
 
-	if err := sshConn.Connect(); err != nil {
+	// Decide se executa comando remoto ou inicia sessão interativa
+	var err error
+	if command != "" {
+		err = sshConn.ExecuteCommand()
+	} else {
+		err = sshConn.Connect()
+	}
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "\n❌ Erro na conexão SSH: %v\n", err)
 		os.Exit(1)
 	}
