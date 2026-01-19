@@ -5,6 +5,8 @@
 [V] permitir uso de user diferente na maquina de salto e no alvo
 [ ] Permitir o envio de arquivos a servidores remoto. (usar o tui para procurar o arquivo ou diretório)
 [ ] Criar uma opção de tunnel (usar proxy via ssh)
+[ ] Adicionar versão do software
+[ ] Fazer um update automático.
 
 
 
