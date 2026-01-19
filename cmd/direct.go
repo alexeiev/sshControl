@@ -17,7 +17,7 @@ import (
 // 3. user@host: "ubuntu@192.168.1.50" (porta 22 por padrão)
 // 4. host:port: "192.168.1.50:22" (usa usuário especificado ou default)
 // 5. host: "192.168.1.50" (usa usuário especificado ou default e porta 22)
-func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, useJumpHost bool, command string) {
+func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string) {
 	var hostname string
 	var port int
 	var sshKey string
@@ -65,10 +65,10 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 		port = host.port
 	}
 
-	// Prepara o Jump Host
-	jumpHost := ""
-	if useJumpHost {
-		jumpHost = cfg.Config.JumpHosts
+	// Busca a chave SSH do jump host se estiver usando jump host
+	jumpHostSSHKey := ""
+	if jumpHost != nil {
+		jumpHostSSHKey = cfg.GetJumpHostSSHKey(jumpHost)
 	}
 
 	// Cria e executa a conexão SSH
@@ -77,8 +77,8 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 		hostname,
 		port,
 		sshKey,
-		useJumpHost,
 		jumpHost,
+		jumpHostSSHKey,
 		command,
 	)
 
@@ -171,14 +171,37 @@ func ParseConnectionString(input string) (user, host string, port int, err error
 	return h.parsedUser, h.hostname, h.port, nil
 }
 
-// ListServers exibe todos os servidores cadastrados no config
+// ListServers exibe todos os servidores e jump hosts cadastrados no config
 func ListServers(cfg *config.ConfigFile) {
+	fmt.Println()
+
+	// Exibe Jump Hosts se houver algum
+	if len(cfg.Config.JumpHosts) > 0 {
+		fmt.Println("🔗 Jump Hosts cadastrados:")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("%-5s %-20s %-15s %s\n", "Idx", "Nome", "Usuário", "Host:Porta")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+		for i, jh := range cfg.Config.JumpHosts {
+			hostPort := fmt.Sprintf("%s:%d", jh.Host, jh.Port)
+			fmt.Printf("%-5d %-20s %-15s %s\n", i+1, jh.Name, jh.User, hostPort)
+		}
+
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("Total: %d jump host(s)\n", len(cfg.Config.JumpHosts))
+		fmt.Println()
+	} else {
+		fmt.Println("ℹ️  Nenhum jump host cadastrado no config.yaml")
+		fmt.Println()
+	}
+
+	// Exibe Servidores
 	if len(cfg.Hosts) == 0 {
-		fmt.Println("Nenhum servidor cadastrado no config.yaml")
+		fmt.Println("ℹ️  Nenhum servidor cadastrado no config.yaml")
+		fmt.Println()
 		return
 	}
 
-	fmt.Println()
 	fmt.Println("📋 Servidores cadastrados:")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("%-20s %s\n", "Nome", "Host:Porta")

@@ -27,7 +27,15 @@ config:
     - name: devops
       ssh_keys:
         - ~/.ssh/id_rsa
-  jump_hosts: jump.example.com
+  jump_hosts:
+    - name: production-jump
+      host: jump.production.example.com
+      user: ubuntu
+      port: 22
+    - name: staging-jump
+      host: jump.staging.example.com
+      user: ubuntu
+      port: 22
 
 hosts:
   - name: dns

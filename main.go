@@ -11,7 +11,7 @@ import (
 
 var (
 	username      string
-	useJumpHost   bool
+	jumpHost      string
 	command       string
 	multipleHosts bool
 	showServers   bool
@@ -28,35 +28,38 @@ e gerenciamento de múltiplos hosts em paralelo.`,
 	Example: `  # Modo interativo (menu TUI)
   sc
   sc -u ubuntu
-  sc -j
 
   # Conexão direta
   sc webserver
   sc 192.168.1.50
   sc ubuntu@192.168.1.50:2222
-  sc -j production-db
+
+  # Usando jump host (por nome ou índice)
+  sc -j production-jump webserver
+  sc -j 1 webserver
+  sc -j staging-jump 192.168.1.50
 
   # Executar comando remoto em host único
   sc -c "uptime" webserver
   sc -u deploy -c "systemctl status nginx" webserver
-  sc -j -c "cat /var/log/app.log" production-app
+  sc -j production-jump -c "cat /var/log/app.log" production-app
 
   # Executar comando em múltiplos hosts
   sc -c "uptime" -l web1 web2 web3
   sc -c "free -h" -l 192.168.1.10 192.168.1.11
-  sc -j -c "df -h" -l db1 db2 db3
+  sc -j 1 -c "df -h" -l db1 db2 db3
 
-  # Listar servidores cadastrados
+  # Listar jump hosts e servidores cadastrados
   sc -s`,
 	Run: runCommand,
 }
 
 func init() {
 	rootCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
-	rootCmd.Flags().BoolVarP(&useJumpHost, "jump", "j", false, "Habilita conexão via Jump Host")
+	rootCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice, ex: production-jump ou 1)")
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
 	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (requer -c)")
-	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista todos os servidores cadastrados no config")
+	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista jump hosts e servidores cadastrados no config")
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
@@ -81,11 +84,25 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Valida o Jump Host se solicitado
-	if useJumpHost && cfg.Config.JumpHosts == "" {
-		fmt.Fprintf(os.Stderr, "Aviso: Jump Host solicitado mas não configurado no config.yaml\n")
-		fmt.Fprintf(os.Stderr, "A opção -j será ignorada.\n\n")
-		useJumpHost = false
+	// Resolve o Jump Host se solicitado
+	var selectedJumpHost *config.JumpHost
+	if jumpHost != "" {
+		if len(cfg.Config.JumpHosts) == 0 {
+			fmt.Fprintf(os.Stderr, "Erro: Nenhum jump host configurado no config.yaml\n")
+			os.Exit(1)
+		}
+
+		selectedJumpHost = cfg.ResolveJumpHost(jumpHost)
+		if selectedJumpHost == nil {
+			fmt.Fprintf(os.Stderr, "Erro: Jump host '%s' não encontrado\n", jumpHost)
+			if len(cfg.Config.JumpHosts) > 0 {
+				fmt.Fprintf(os.Stderr, "Jump hosts disponíveis:\n")
+				for i, jh := range cfg.Config.JumpHosts {
+					fmt.Fprintf(os.Stderr, "  %d. %s (%s@%s:%d)\n", i+1, jh.Name, jh.User, jh.Host, jh.Port)
+				}
+			}
+			os.Exit(1)
+		}
 	}
 
 	// Valida e aplica o usuário se especificado
@@ -122,14 +139,14 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
 			os.Exit(1)
 		}
-		cmd.ConnectMultiple(cfg, args, selectedUser, useJumpHost, command)
+		cmd.ConnectMultiple(cfg, args, selectedUser, selectedJumpHost, command)
 		return
 	}
 
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, hostArg, selectedUser, useJumpHost, command)
+		cmd.Connect(cfg, hostArg, selectedUser, selectedJumpHost, command)
 		return
 	}
 
@@ -141,7 +158,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	}
 
 	// Modo interativo (menu)
-	cmd.ShowInteractive(cfg, selectedUser, useJumpHost)
+	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost)
 }
 
 func main() {

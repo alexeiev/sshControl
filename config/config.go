@@ -14,11 +14,19 @@ type User struct {
 	SSHKeys []string `yaml:"ssh_keys"`
 }
 
+// JumpHost representa um jump host configurado
+type JumpHost struct {
+	Name string `yaml:"name"`
+	Host string `yaml:"host"`
+	User string `yaml:"user"`
+	Port int    `yaml:"port"`
+}
+
 // Config representa a seção de configuração global
 type Config struct {
-	DefaultUser string `yaml:"default_user"`
-	User        []User `yaml:"users"`
-	JumpHosts   string `yaml:"jump_hosts"`
+	DefaultUser string     `yaml:"default_user"`
+	User        []User     `yaml:"users"`
+	JumpHosts   []JumpHost `yaml:"jump_hosts"`
 }
 
 // Host representa um host SSH
@@ -103,6 +111,58 @@ func (c *ConfigFile) FindHost(name string) *Host {
 		}
 	}
 	return nil
+}
+
+// FindJumpHost procura um jump host pelo nome
+func (c *ConfigFile) FindJumpHost(name string) *JumpHost {
+	for i := range c.Config.JumpHosts {
+		if c.Config.JumpHosts[i].Name == name {
+			return &c.Config.JumpHosts[i]
+		}
+	}
+	return nil
+}
+
+// GetJumpHostByIndex retorna um jump host pelo índice (1-based)
+func (c *ConfigFile) GetJumpHostByIndex(index int) *JumpHost {
+	if index < 1 || index > len(c.Config.JumpHosts) {
+		return nil
+	}
+	return &c.Config.JumpHosts[index-1]
+}
+
+// ResolveJumpHost resolve um jump host por nome ou índice
+// Aceita: "jumpname" ou "1", "2", etc.
+func (c *ConfigFile) ResolveJumpHost(identifier string) *JumpHost {
+	if identifier == "" {
+		return nil
+	}
+
+	// Tenta parsear como número
+	var index int
+	_, err := fmt.Sscanf(identifier, "%d", &index)
+	if err == nil {
+		// É um número, busca por índice
+		return c.GetJumpHostByIndex(index)
+	}
+
+	// Não é número, busca por nome
+	return c.FindJumpHost(identifier)
+}
+
+// GetJumpHostSSHKey retorna a chave SSH do usuário configurado no jump host
+func (c *ConfigFile) GetJumpHostSSHKey(jumpHost *JumpHost) string {
+	if jumpHost == nil {
+		return ""
+	}
+
+	// Busca o usuário do jump host no config
+	user := c.FindUser(jumpHost.User)
+	if user == nil || len(user.SSHKeys) == 0 {
+		return ""
+	}
+
+	return ExpandHomePath(user.SSHKeys[0])
 }
 
 // FormatConnection formata a string de conexão SSH

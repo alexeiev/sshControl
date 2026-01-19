@@ -23,9 +23,10 @@ go run .
 
 ## Exemplos de Uso
 
-### Listagem de Servidores
+### Listagem de Jump Hosts e Servidores
 ```bash
-# Lista todos os servidores cadastrados no config.yaml
+# Lista todos os jump hosts e servidores cadastrados no config.yaml
+# Jump hosts são exibidos com seus índices para facilitar o uso com -j
 sc -s
 ```
 
@@ -36,9 +37,6 @@ sc
 
 # Menu interativo usando usuário específico
 sc -u ubuntu
-
-# Menu interativo com jump host habilitado
-sc -j
 ```
 
 ### Modo Direto (Sessão Interativa)
@@ -52,8 +50,11 @@ sc 192.168.1.50
 # Conecta com usuário e porta específicos
 sc ubuntu@192.168.1.50:2222
 
-# Conecta via jump host
-sc -j production-db
+# Conecta via jump host (por nome)
+sc -j production-jump webserver
+
+# Conecta via jump host (por índice)
+sc -j 1 webserver
 ```
 
 ### Execução de Comando Remoto (Host Único)
@@ -67,8 +68,11 @@ sc -c "df -h" 192.168.1.50
 # Executa comando com usuário específico
 sc -u deploy -c "systemctl status nginx" webserver
 
-# Executa comando via jump host
-sc -j -c "cat /var/log/app.log" production-app
+# Executa comando via jump host (por nome)
+sc -j production-jump -c "cat /var/log/app.log" production-app
+
+# Executa comando via jump host (por índice)
+sc -j 1 -c "uptime" webserver
 ```
 
 ### Execução de Comando em Múltiplos Hosts
@@ -82,8 +86,11 @@ sc -c "free -h" -l 192.168.1.10 192.168.1.11 192.168.1.12
 # Combina hosts do config e IPs diretos
 sc -c "hostname" -l web1 192.168.1.50 ubuntu@192.168.1.51
 
-# Executa em múltiplos hosts via jump host
-sc -j -c "df -h" -l db1 db2 db3
+# Executa em múltiplos hosts via jump host (por nome)
+sc -j production-jump -c "df -h" -l db1 db2 db3
+
+# Executa em múltiplos hosts via jump host (por índice)
+sc -j 1 -c "df -h" -l db1 db2 db3
 
 # Com usuário específico
 sc -u admin -c "systemctl status nginx" -l web1 web2 web3
@@ -96,8 +103,44 @@ A aplicação utiliza um arquivo de configuração YAML localizado em `~/.sshCon
 Estrutura da configuração:
 - `config.default_user`: Usuário SSH padrão a ser usado
 - `config.users[]`: Lista de usuários com suas chaves SSH
-- `config.jump_hosts`: Endereço do jump host para conexões proxadas
+- `config.jump_hosts[]`: Lista de jump hosts configurados, cada um com:
+  - `name`: Nome identificador do jump host
+  - `host`: Endereço do jump host
+  - `user`: Usuário para autenticação no jump host
+  - `port`: Porta SSH do jump host
 - `hosts[]`: Lista de hosts SSH com nome, endereço do host e porta
+
+### Exemplo de Configuração
+
+```yaml
+config:
+  default_user: ubuntu
+  users:
+    - name: ubuntu
+      ssh_keys:
+        - ~/.ssh/id_rsa
+        - ~/.ssh/id_ed25519
+    - name: devops
+      ssh_keys:
+        - ~/.ssh/id_rsa
+  jump_hosts:
+    - name: production-jump
+      host: jump.production.example.com
+      user: ubuntu
+      port: 22
+    - name: staging-jump
+      host: jump.staging.example.com
+      user: ubuntu
+      port: 22
+
+hosts:
+  - name: dns
+    host: 192.168.1.31
+    port: 22
+  - name: traefik
+    host: 192.168.1.32
+    port: 22
+```
 
 ## Arquitetura
 
@@ -105,7 +148,7 @@ Estrutura da configuração:
 
 **main.go**: Ponto de entrada que gerencia flags CLI e roteamento usando Cobra:
 - `-u, --user <username>`: Especifica qual usuário do config usar
-- `-j, --jump`: Habilita modo de conexão via jump host
+- `-j, --jump <jump_host>`: Especifica qual jump host usar (nome ou índice, ex: production-jump ou 1)
 - `-c, --command "<comando>"`: Executa comando remoto (requer especificar host)
 - `-l, --list`: Executa comando em múltiplos hosts (requer `-c`)
 - `-s, --servers`: Lista todos os servidores cadastrados no config.yaml
@@ -115,8 +158,8 @@ Estrutura da configuração:
 - Modo interativo: `sc [flags]` exibe menu TUI
 
 **Pacote config/**: Gerenciamento de configuração
-- `config.go`: Carregamento de config YAML, busca de usuário/host e funções auxiliares para expansão de chaves SSH
-- `init.go`: Inicializa automaticamente o diretório `~/.sshControl/` e cria template de config padrão na primeira execução
+- `config.go`: Carregamento de config YAML, busca de usuário/host e funções auxiliares para expansão de chaves SSH. Inclui funções para resolver jump hosts por nome (`FindJumpHost`) ou índice (`GetJumpHostByIndex`) e função consolidada `ResolveJumpHost` que aceita ambos
+- `init.go`: Inicializa automaticamente o diretório `~/.sshControl/` e cria template de config padrão na primeira execução com exemplos de jump hosts
 
 **Pacote cmd/**: Lógica de conexão e UI
 - `ssh.go`: Implementação central da conexão SSH (struct `SSHConnection`)
@@ -134,8 +177,9 @@ Estrutura da configuração:
 
 1. **Carregamento de Config**: `InitializeConfigDir()` garante que `~/.sshControl/config.yaml` existe
 2. **Resolução de Usuário**: Prioridade é flag `-u` > `default_user` > primeiro usuário da lista
-3. **Resolução de Host**: Busca por nome no config ou analisa string de conexão direta
-4. **Conexão SSH**: `SSHConnection.Connect()` gerencia:
+3. **Resolução de Jump Host**: Se especificado via `-j`, usa `ResolveJumpHost()` que aceita nome (ex: "production-jump") ou índice numérico (ex: "1")
+4. **Resolução de Host**: Busca por nome no config ou analisa string de conexão direta
+5. **Conexão SSH**: `SSHConnection.Connect()` gerencia:
    - Criação de config SSH com métodos de autenticação (chave → agent → senha)
    - Dial direto ou proxy via jump host através de `dial()`
    - Sessão PTY interativa com tratamento adequado de terminal
@@ -143,9 +187,11 @@ Estrutura da configuração:
 ### Padrões de Design Principais
 
 - **Precedência de Usuário**: O método `GetEffectiveUser()` implementa seleção cascata de usuário
-- **Padrão Jump Host**: Quando habilitado, cria duas conexões SSH - primeira ao jump host, depois disca o alvo através dele
+- **Seleção de Jump Host**: Suporta múltiplos jump hosts configurados, selecionáveis por nome ou índice numérico (1-based). A função `ResolveJumpHost()` tenta primeiro parsear como número, depois busca por nome
+- **Padrão Jump Host**: Quando configurado, cria duas conexões SSH - primeira ao jump host especificado (usando suas credenciais), depois disca o alvo através dele
 - **Análise de Conexão Direta**: Parser baseado em regex em `direct.go` lida com formatos flexíveis de string de conexão
 - **Gerenciamento de Terminal**: Salva/restaura adequadamente o modo raw do terminal e monitora SIGWINCH para eventos de redimensionamento
+- **Execução Paralela**: Em modo múltiplos hosts com `-l`, executa comandos simultaneamente em goroutines e exibe tempo total de execução no resumo final
 
 ### Dependências
 

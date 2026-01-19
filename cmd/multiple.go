@@ -21,7 +21,7 @@ type HostResult struct {
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
-func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, useJumpHost bool, command string) {
+func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string) {
 	// Determina o usuário efetivo
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
 	if effectiveUser == nil {
@@ -29,14 +29,11 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 		os.Exit(1)
 	}
 
-	// Prepara o Jump Host
-	jumpHost := ""
-	if useJumpHost {
-		jumpHost = cfg.Config.JumpHosts
-	}
-
 	fmt.Println()
 	fmt.Printf("🚀 Executando comando em %d host(s): %s\n", len(hostArgs), command)
+	if jumpHost != nil {
+		fmt.Printf("   via Jump Host: %s (%s@%s:%d)\n", jumpHost.Name, jumpHost.User, jumpHost.Host, jumpHost.Port)
+	}
 	fmt.Println()
 
 	// Captura o tempo de início
@@ -51,7 +48,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 		wg.Add(1)
 		go func(hostArg string) {
 			defer wg.Done()
-			result := executeOnHost(cfg, hostArg, effectiveUser, useJumpHost, jumpHost, command)
+			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, command)
 			results <- result
 		}(hostArg)
 	}
@@ -76,7 +73,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
-func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, useJumpHost bool, jumpHost string, command string) HostResult {
+func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, command string) HostResult {
 	var hostname string
 	var port int
 	var sshKey string
@@ -118,14 +115,20 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		port = host.port
 	}
 
+	// Busca a chave SSH do jump host se estiver usando jump host
+	jumpHostSSHKey := ""
+	if jumpHost != nil {
+		jumpHostSSHKey = cfg.GetJumpHostSSHKey(jumpHost)
+	}
+
 	// Cria a conexão SSH
 	sshConn := NewSSHConnection(
 		username,
 		hostname,
 		port,
 		sshKey,
-		useJumpHost,
 		jumpHost,
+		jumpHostSSHKey,
 		command,
 	)
 

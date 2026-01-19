@@ -7,19 +7,20 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/ceiev/sshControl/config"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
 
 // SSHConnection representa os parâmetros de uma conexão SSH
 type SSHConnection struct {
-	User        string
-	Host        string
-	Port        int
-	SSHKey      string
-	JumpHost    string
-	UseJumpHost bool
-	Command     string
+	User          string
+	Host          string
+	Port          int
+	SSHKey        string
+	JumpHost      *config.JumpHost
+	JumpHostSSHKey string
+	Command       string
 }
 
 // Connect estabelece uma conexão SSH interativa
@@ -107,23 +108,19 @@ func (s *SSHConnection) createSSHConfig() (*ssh.ClientConfig, error) {
 	return s.createSSHConfigWithContext(fmt.Sprintf("%s@%s:%d", s.User, s.Host, s.Port))
 }
 
-// createSSHConfigWithContext cria a configuração do cliente SSH com contexto para prompts
-func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientConfig, error) {
+// createAuthMethods cria os métodos de autenticação para SSH
+func (s *SSHConnection) createAuthMethods(sshKeyPath string, context string) []ssh.AuthMethod {
 	authMethods := []ssh.AuthMethod{}
 
 	// Adiciona autenticação por chave SSH se especificada
-	if s.SSHKey != "" {
-		key, err := os.ReadFile(s.SSHKey)
-		if err != nil {
-			return nil, fmt.Errorf("erro ao ler chave SSH %s: %w", s.SSHKey, err)
+	if sshKeyPath != "" {
+		key, err := os.ReadFile(sshKeyPath)
+		if err == nil {
+			signer, err := ssh.ParsePrivateKey(key)
+			if err == nil {
+				authMethods = append(authMethods, ssh.PublicKeys(signer))
+			}
 		}
-
-		signer, err := ssh.ParsePrivateKey(key)
-		if err != nil {
-			return nil, fmt.Errorf("erro ao parsear chave SSH: %w", err)
-		}
-
-		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
 	// Adiciona autenticação via SSH Agent se disponível
@@ -143,6 +140,13 @@ func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientC
 		return string(password), nil
 	}))
 
+	return authMethods
+}
+
+// createSSHConfigWithContext cria a configuração do cliente SSH com contexto para prompts
+func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientConfig, error) {
+	authMethods := s.createAuthMethods(s.SSHKey, context)
+
 	config := &ssh.ClientConfig{
 		User:            s.User,
 		Auth:            authMethods,
@@ -157,20 +161,25 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 	address := fmt.Sprintf("%s:%d", s.Host, s.Port)
 
 	// Conexão direta se não usar Jump Host
-	if !s.UseJumpHost || s.JumpHost == "" {
+	if s.JumpHost == nil {
 		return ssh.Dial("tcp", address, config)
 	}
 
-	// Cria configuração separada para Jump Host com contexto claro
-	jumpConfig, err := s.createSSHConfigWithContext(fmt.Sprintf("%s@%s (Jump Host)", s.User, s.JumpHost))
-	if err != nil {
-		return nil, fmt.Errorf("erro ao criar configuração para Jump Host: %w", err)
+	// Cria métodos de autenticação específicos para o Jump Host
+	jumpAuthMethods := s.createAuthMethods(s.JumpHostSSHKey, fmt.Sprintf("%s@%s (Jump Host)", s.JumpHost.User, s.JumpHost.Host))
+
+	// Cria configuração separada para Jump Host
+	jumpConfig := &ssh.ClientConfig{
+		User:            s.JumpHost.User,
+		Auth:            jumpAuthMethods,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	// Conecta ao Jump Host (assume porta 22)
-	jumpClient, err := ssh.Dial("tcp", net.JoinHostPort(s.JumpHost, "22"), jumpConfig)
+	// Conecta ao Jump Host
+	jumpAddress := fmt.Sprintf("%s:%d", s.JumpHost.Host, s.JumpHost.Port)
+	jumpClient, err := ssh.Dial("tcp", jumpAddress, jumpConfig)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao conectar ao Jump Host %s: %w", s.JumpHost, err)
+		return nil, fmt.Errorf("erro ao conectar ao Jump Host %s: %w", s.JumpHost.Name, err)
 	}
 
 	// Conecta ao host final através do Jump Host
@@ -300,22 +309,22 @@ func (s *SSHConnection) formatConnectionString() string {
 		conn += fmt.Sprintf(" (key: %s)", s.SSHKey)
 	}
 
-	if s.UseJumpHost && s.JumpHost != "" {
-		conn += fmt.Sprintf(" via %s", s.JumpHost)
+	if s.JumpHost != nil {
+		conn += fmt.Sprintf(" via %s (%s@%s:%d)", s.JumpHost.Name, s.JumpHost.User, s.JumpHost.Host, s.JumpHost.Port)
 	}
 
 	return conn
 }
 
 // NewSSHConnection cria uma nova conexão SSH
-func NewSSHConnection(user, host string, port int, sshKey string, useJumpHost bool, jumpHost string, command string) *SSHConnection {
+func NewSSHConnection(user, host string, port int, sshKey string, jumpHost *config.JumpHost, jumpHostSSHKey string, command string) *SSHConnection {
 	return &SSHConnection{
-		User:        user,
-		Host:        host,
-		Port:        port,
-		SSHKey:      sshKey,
-		JumpHost:    jumpHost,
-		UseJumpHost: useJumpHost,
-		Command:     command,
+		User:           user,
+		Host:           host,
+		Port:           port,
+		SSHKey:         sshKey,
+		JumpHost:       jumpHost,
+		JumpHostSSHKey: jumpHostSSHKey,
+		Command:        command,
 	}
 }

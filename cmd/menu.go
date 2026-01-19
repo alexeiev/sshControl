@@ -74,7 +74,7 @@ type model struct {
 	filterActive   bool
 	cfg            *config.ConfigFile
 	selectedUser   *config.User
-	useJumpHost    bool
+	jumpHost       *config.JumpHost
 	allItems       []list.Item
 	selectedHost   *config.Host
 	selectedSSHKey string
@@ -83,7 +83,7 @@ type model struct {
 }
 
 // ShowInteractive exibe o menu interativo usando bubbletea
-func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, useJumpHost bool) {
+func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost) {
 	if len(cfg.Hosts) == 0 {
 		fmt.Println("Nenhum host configurado no arquivo config.yaml")
 		return
@@ -130,7 +130,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, useJumpH
 		filterActive: false,
 		cfg:          cfg,
 		selectedUser: selectedUser,
-		useJumpHost:  useJumpHost,
+		jumpHost:     jumpHost,
 		allItems:     items,
 	}
 
@@ -143,9 +143,10 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, useJumpH
 
 	// Conecta ao host selecionado
 	if m, ok := finalModel.(model); ok && m.selectedHost != nil {
-		jumpHost := ""
-		if m.useJumpHost {
-			jumpHost = m.cfg.Config.JumpHosts
+		// Busca a chave SSH do jump host se estiver usando jump host
+		jumpHostSSHKey := ""
+		if m.jumpHost != nil {
+			jumpHostSSHKey = m.cfg.GetJumpHostSSHKey(m.jumpHost)
 		}
 
 		sshConn := NewSSHConnection(
@@ -153,8 +154,8 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, useJumpH
 			m.selectedHost.Host,
 			m.selectedHost.Port,
 			m.selectedSSHKey,
-			m.useJumpHost,
-			jumpHost,
+			m.jumpHost,
+			jumpHostSSHKey,
 			"", // Modo interativo não executa comandos remotos
 		)
 
@@ -237,9 +238,9 @@ func (m model) View() string {
 	}
 
 	// Status do Jump Host
-	jumpHostStatus := jumpHostDisabledStyle.Render("Disabled")
-	if m.useJumpHost {
-		jumpHostStatus = jumpHostEnabledStyle.Render("Enabled")
+	jumpHostStatus := jumpHostDisabledStyle.Render("None")
+	if m.jumpHost != nil {
+		jumpHostStatus = jumpHostEnabledStyle.Render(m.jumpHost.Name)
 	}
 
 	banner := fmt.Sprintf(
