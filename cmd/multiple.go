@@ -9,6 +9,7 @@ import (
 
 	"github.com/ceiev/sshControl/config"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/term"
 )
 
 // HostResult armazena o resultado da execução em um host
@@ -36,6 +37,20 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 	}
 	fmt.Println()
 
+	// Se o usuário não tem chave SSH, pede a senha uma vez antes de iniciar as conexões paralelas
+	password := ""
+	if len(effectiveUser.SSHKeys) == 0 {
+		fmt.Printf("Password for %s (será usada para todos os hosts): ", effectiveUser.Name)
+		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
+			os.Exit(1)
+		}
+		password = string(passwordBytes)
+		fmt.Println()
+	}
+
 	// Captura o tempo de início
 	startTime := time.Now()
 
@@ -48,7 +63,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 		wg.Add(1)
 		go func(hostArg string) {
 			defer wg.Done()
-			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, command)
+			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command)
 			results <- result
 		}(hostArg)
 	}
@@ -73,7 +88,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
-func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, command string) HostResult {
+func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string) HostResult {
 	var hostname string
 	var port int
 	var sshKey string
@@ -127,6 +142,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		hostname,
 		port,
 		sshKey,
+		password, // Senha pré-fornecida ou vazia
 		jumpHost,
 		jumpHostSSHKey,
 		command,

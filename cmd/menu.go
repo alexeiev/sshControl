@@ -154,6 +154,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 			m.selectedHost.Host,
 			m.selectedHost.Port,
 			m.selectedSSHKey,
+			"", // Senha vazia - será pedida interativamente se necessário
 			m.jumpHost,
 			jumpHostSSHKey,
 			"", // Modo interativo não executa comandos remotos

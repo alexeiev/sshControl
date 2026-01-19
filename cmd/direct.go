@@ -77,6 +77,7 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 		hostname,
 		port,
 		sshKey,
+		"", // Senha vazia - será pedida interativamente se necessário
 		jumpHost,
 		jumpHostSSHKey,
 		command,

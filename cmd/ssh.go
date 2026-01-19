@@ -14,13 +14,14 @@ import (
 
 // SSHConnection representa os parâmetros de uma conexão SSH
 type SSHConnection struct {
-	User          string
-	Host          string
-	Port          int
-	SSHKey        string
-	JumpHost      *config.JumpHost
+	User           string
+	Host           string
+	Port           int
+	SSHKey         string
+	Password       string // Senha pré-fornecida (opcional)
+	JumpHost       *config.JumpHost
 	JumpHostSSHKey string
-	Command       string
+	Command        string
 }
 
 // Connect estabelece uma conexão SSH interativa
@@ -128,17 +129,22 @@ func (s *SSHConnection) createAuthMethods(sshKeyPath string, context string) []s
 		authMethods = append(authMethods, agentAuth)
 	}
 
-	// Sempre adiciona senha interativa como fallback final
-	// Será solicitada apenas se todos os métodos anteriores falharem
-	authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
-		fmt.Printf("Password for %s: ", context)
-		password, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Println()
-		if err != nil {
-			return "", err
-		}
-		return string(password), nil
-	}))
+	// Adiciona autenticação por senha
+	if s.Password != "" {
+		// Se a senha foi pré-fornecida, usa ela diretamente
+		authMethods = append(authMethods, ssh.Password(s.Password))
+	} else {
+		// Caso contrário, pede senha interativamente como fallback
+		authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
+			fmt.Printf("Password for %s: ", context)
+			password, err := term.ReadPassword(int(os.Stdin.Fd()))
+			fmt.Println()
+			if err != nil {
+				return "", err
+			}
+			return string(password), nil
+		}))
+	}
 
 	return authMethods
 }
@@ -317,12 +323,13 @@ func (s *SSHConnection) formatConnectionString() string {
 }
 
 // NewSSHConnection cria uma nova conexão SSH
-func NewSSHConnection(user, host string, port int, sshKey string, jumpHost *config.JumpHost, jumpHostSSHKey string, command string) *SSHConnection {
+func NewSSHConnection(user, host string, port int, sshKey, password string, jumpHost *config.JumpHost, jumpHostSSHKey string, command string) *SSHConnection {
 	return &SSHConnection{
 		User:           user,
 		Host:           host,
 		Port:           port,
 		SSHKey:         sshKey,
+		Password:       password,
 		JumpHost:       jumpHost,
 		JumpHostSSHKey: jumpHostSSHKey,
 		Command:        command,
