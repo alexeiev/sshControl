@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/ceiev/sshControl/config"
 	"golang.org/x/crypto/ssh"
@@ -38,6 +39,9 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 	fmt.Printf("🚀 Executando comando em %d host(s): %s\n", len(hostArgs), command)
 	fmt.Println()
 
+	// Captura o tempo de início
+	startTime := time.Now()
+
 	// Canal para coletar resultados
 	results := make(chan HostResult, len(hostArgs))
 	var wg sync.WaitGroup
@@ -64,8 +68,11 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 		allResults = append(allResults, result)
 	}
 
+	// Calcula o tempo total de execução
+	duration := time.Since(startTime)
+
 	// Exibe resultados organizados
-	displayResults(allResults)
+	displayResults(allResults, duration)
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
@@ -143,7 +150,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 }
 
 // displayResults exibe os resultados de forma organizada
-func displayResults(results []HostResult) {
+func displayResults(results []HostResult, duration time.Duration) {
 	successCount := 0
 	failureCount := 0
 
@@ -182,7 +189,7 @@ func displayResults(results []HostResult) {
 
 	// Resumo final
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("📊 Resumo: %d sucesso(s), %d falha(s), %d total\n", successCount, failureCount, len(results))
+	fmt.Printf("📊 Resumo: %d sucesso(s), %d falha(s), %d total | ⏱️  Tempo: %.2fs\n", successCount, failureCount, len(results), duration.Seconds())
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }
 

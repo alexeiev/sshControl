@@ -1,6 +1,6 @@
 # FEATURE
 [V] Permitir o envio de comandos remotos a uma lista de hosts
-[ ] Criar uma opção para listar os hosts cadastrados
+[V] Criar uma opção para listar os hosts cadastrados
 [ ] Criar lista de JumpServers com itens ["Name", "User", "IP/Host", "Port" ]
 [ ] permitir uso de user diferente na maquina de salto e no alvo
 [ ] Permitir o envio de arquivos a servidores remoto. (usar o tui para procurar o arquivo ou diretório)
