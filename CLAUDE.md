@@ -103,12 +103,13 @@ Estrutura da configuração:
 
 ### Estrutura de Pacotes
 
-**main.go**: Ponto de entrada que gerencia flags CLI e roteamento:
-- `-u <username>`: Especifica qual usuário do config usar
-- `-j`: Habilita modo de conexão via jump host
-- `-c "<comando>"`: Executa comando remoto (requer especificar host)
-- `-l`: Executa comando em múltiplos hosts (requer `-c`)
-- `-s`: Lista todos os servidores cadastrados no config.yaml
+**main.go**: Ponto de entrada que gerencia flags CLI e roteamento usando Cobra:
+- `-u, --user <username>`: Especifica qual usuário do config usar
+- `-j, --jump`: Habilita modo de conexão via jump host
+- `-c, --command "<comando>"`: Executa comando remoto (requer especificar host)
+- `-l, --list`: Executa comando em múltiplos hosts (requer `-c`)
+- `-s, --servers`: Lista todos os servidores cadastrados no config.yaml
+- `-h, --help`: Exibe ajuda com exemplos de uso
 - Modo direto: `sc [flags] <host>` conecta imediatamente
 - Modo múltiplos hosts: `sc -c "comando" -l <host1> <host2> ...` executa comando em paralelo
 - Modo interativo: `sc [flags]` exibe menu TUI
@@ -148,6 +149,7 @@ Estrutura da configuração:
 
 ### Dependências
 
+- `github.com/spf13/cobra`: Framework CLI para gerenciamento de comandos e flags com help automático
 - `github.com/charmbracelet/bubbletea`: Framework TUI para menu interativo
 - `github.com/charmbracelet/bubbles`: Componentes de UI (list, textinput)
 - `github.com/charmbracelet/lipgloss`: Estilização de terminal
