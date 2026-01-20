@@ -6,7 +6,7 @@
 [ ] Permitir o envio de arquivos a servidores remoto. (usar o tui para procurar o arquivo ou diretório)
 [ ] Criar uma opção de tunnel (usar proxy via ssh)
 [V] Adicionar versão do software
-[ ] Fazer um update automático.
+[V] Fazer um update automático.
 
 
 

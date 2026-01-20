@@ -1,0 +1,275 @@
+# sshControl (sc)
+
+Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo CLI direto.
+
+## Características
+
+- 🚀 **Modo Interativo (TUI)**: Menu visual para seleção de hosts
+- ⚡ **Modo Direto**: Conecte rapidamente via linha de comando
+- 🔗 **Jump Hosts**: Suporte completo para conexões via bastion/jump hosts
+- 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente
+- 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
+- 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
+
+## Instalação
+
+### Download Direto
+
+Baixe o binário pré-compilado da [última release](https://github.com/alexeiev/sshControl/releases/latest):
+
+**Linux (amd64)**:
+```bash
+curl -L https://github.com/alexeiev/sshControl/releases/latest/download/sc-VERSION-linux-amd64.tar.gz | tar xz
+sudo mv sc /usr/local/bin/
+```
+
+**macOS (Apple Silicon)**:
+```bash
+curl -L https://github.com/alexeiev/sshControl/releases/latest/download/sc-VERSION-darwin-arm64.tar.gz | tar xz
+sudo mv sc /usr/local/bin/
+```
+
+**macOS (Intel)**:
+```bash
+curl -L https://github.com/alexeiev/sshControl/releases/latest/download/sc-VERSION-darwin-amd64.tar.gz | tar xz
+sudo mv sc /usr/local/bin/
+```
+
+### Compilar do Código Fonte
+
+```bash
+git clone https://github.com/alexeiev/sshControl.git
+cd sshControl
+make build
+# Binários estarão em bin/amd64/sc e bin/arm64/sc
+```
+
+## Configuração
+
+Na primeira execução, o sshControl cria automaticamente o arquivo de configuração em `~/.sshControl/config.yaml`.
+
+### Exemplo de Configuração
+
+```yaml
+config:
+  default_user: ubuntu
+  users:
+    - name: ubuntu
+      ssh_keys:
+        - ~/.ssh/id_rsa
+        - ~/.ssh/id_ed25519
+    - name: admin
+      ssh_keys:
+        - ~/.ssh/admin_key
+  jump_hosts:
+    - name: production-jump
+      host: jump.production.example.com
+      user: ubuntu
+      port: 22
+    - name: staging-jump
+      host: jump.staging.example.com
+      user: ubuntu
+      port: 22
+
+hosts:
+  - name: webserver
+    host: 192.168.1.50
+    port: 22
+  - name: database
+    host: 192.168.1.51
+    port: 22
+  - name: app-server
+    host: 10.0.1.100
+    port: 22
+```
+
+## Uso
+
+### Modo Interativo (TUI)
+
+```bash
+# Abre menu interativo
+sc
+
+# Menu com usuário específico
+sc -u admin
+```
+
+### Conexão Direta
+
+```bash
+# Conecta a host configurado
+sc webserver
+
+# Conecta a IP diretamente
+sc 192.168.1.50
+
+# Especifica usuário e porta
+sc ubuntu@192.168.1.50:2222
+
+# Via jump host (por nome)
+sc -j production-jump webserver
+
+# Via jump host (por índice)
+sc -j 1 webserver
+```
+
+### Execução de Comandos
+
+**Host único**:
+```bash
+# Em host configurado
+sc -c "uptime" webserver
+
+# Em IP direto
+sc -c "df -h" 192.168.1.50
+
+# Com jump host
+sc -j production-jump -c "systemctl status nginx" app-server
+```
+
+**Múltiplos hosts**:
+```bash
+# Em vários hosts configurados
+sc -c "uptime" -l web1 web2 web3
+
+# Mistura de hosts e IPs
+sc -c "free -h" -l webserver 192.168.1.50 ubuntu@192.168.1.51
+
+# Via jump host
+sc -j 1 -c "df -h" -l db1 db2 db3
+```
+
+### Comandos Úteis
+
+```bash
+# Listar servidores e jump hosts cadastrados
+sc -s
+
+# Verificar versão
+sc --version
+
+# Atualizar para versão mais recente
+sc update
+
+# Ajuda
+sc --help
+```
+
+## Características Detalhadas
+
+### Jump Hosts
+
+Configure múltiplos jump hosts e use-os por nome ou índice:
+
+```yaml
+config:
+  jump_hosts:
+    - name: production-jump  # índice 1
+      host: bastion1.prod.com
+      user: ubuntu
+      port: 22
+    - name: staging-jump     # índice 2
+      host: bastion.staging.com
+      user: ubuntu
+      port: 22
+```
+
+```bash
+# Por nome
+sc -j production-jump webserver
+
+# Por índice
+sc -j 1 webserver
+```
+
+### Autenticação
+
+Ordem de tentativa de autenticação:
+1. Chave SSH (especificada no config)
+2. SSH Agent (se disponível)
+3. Senha (solicitada interativamente)
+
+### Execução Paralela
+
+O modo múltiplos hosts (`-l`) executa comandos simultaneamente:
+
+```bash
+sc -c "uptime" -l server1 server2 server3 server4
+```
+
+Exibe resultados organizados com:
+- ✅ Sucesso ou ❌ Falha por host
+- Exit code de cada comando
+- Tempo total de execução
+- Resumo com contadores
+
+### Auto-Atualização
+
+```bash
+sc update
+```
+
+O comando:
+1. Verifica a última versão no GitHub
+2. Compara com a versão atual
+3. Baixa o binário apropriado para seu OS/arquitetura
+4. Substitui o binário atual (com backup)
+5. Confirma a atualização
+
+## Desenvolvimento
+
+### Build Local
+
+```bash
+# Compila para Linux e macOS
+make build
+
+# Executa sem compilar
+go run .
+
+# Build com versão customizada
+VERSION=v1.0.0 make build
+```
+
+### Criar uma Release
+
+```bash
+# 1. Commite todas as mudanças
+git add .
+git commit -m "Release v1.0.0"
+
+# 2. Crie e envie a tag
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin main
+git push origin v1.0.0
+```
+
+O GitHub Actions automaticamente:
+- Compila para todas as plataformas
+- Cria arquivos tar.gz
+- Gera checksums
+- Publica a release
+
+## Requisitos
+
+- Go 1.25+ (para compilar)
+- Acesso SSH aos hosts desejados
+- Git (para versionamento durante build)
+
+## Licença
+
+[Especifique sua licença aqui]
+
+## Contribuindo
+
+Contribuições são bem-vindas! Por favor:
+1. Fork o projeto
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Push para a branch
+5. Abra um Pull Request
+
+## Suporte
+
+Para reportar bugs ou solicitar features, abra uma [issue](https://github.com/alexeiev/sshControl/issues).

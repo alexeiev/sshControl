@@ -39,6 +39,14 @@ sc -v
 sc --version
 ```
 
+### Atualização Automática
+```bash
+# Verifica e atualiza para a versão mais recente do GitHub
+sc update
+```
+
+A ferramenta verifica automaticamente se há uma nova versão disponível nas GitHub Releases e oferece opção de atualizar o binário. O processo é totalmente automatizado e substitui o binário atual pela nova versão.
+
 ### Listagem de Jump Hosts e Servidores
 ```bash
 # Lista todos os jump hosts e servidores cadastrados no config.yaml
@@ -219,6 +227,66 @@ hosts:
 - `golang.org/x/crypto/ssh`: Implementação do protocolo SSH
 - `golang.org/x/term`: Controle de terminal para modo raw e PTY
 - `gopkg.in/yaml.v3`: Parse de configuração YAML
+
+## Sistema de Releases e CI/CD
+
+### GitHub Actions Workflow
+
+O projeto utiliza GitHub Actions para automatizar o processo de build e release. O workflow é acionado quando uma tag de versão é criada.
+
+**Arquivo**: `.github/workflows/release.yml`
+
+**Processo automatizado**:
+1. Detecta quando uma tag `v*` é criada (ex: `v1.0.0`)
+2. Compila binários para múltiplas plataformas:
+   - Linux (amd64)
+   - macOS (arm64 - Apple Silicon)
+   - macOS (amd64 - Intel)
+3. Injeta informações de versão nos binários via ldflags
+4. Cria arquivos compactados (tar.gz) para cada plataforma
+5. Gera checksums SHA256 para verificação
+6. Cria uma GitHub Release com todos os binários anexados
+
+### Como Fazer uma Release
+
+```bash
+# 1. Certifique-se de que todas as mudanças estão commitadas
+git add .
+git commit -m "Release v1.0.0"
+
+# 2. Crie uma tag com a versão
+git tag -a v1.0.0 -m "Release v1.0.0"
+
+# 3. Envie o commit e a tag para o GitHub
+git push origin main
+git push origin v1.0.0
+```
+
+O GitHub Actions será automaticamente acionado e criará a release com os binários compilados.
+
+### Sistema de Auto-Atualização
+
+**Pacote updater/**: Gerencia atualizações automáticas
+- `updater.go`: Implementação do sistema de atualização que:
+  - Consulta a GitHub API para obter a última release
+  - Compara versões (atual vs disponível)
+  - Baixa o binário apropriado baseado em OS/arquitetura
+  - Substitui o binário atual com backup automático
+  - Suporta verificação de integridade
+
+**Comando**: `sc update`
+- Verifica se há nova versão disponível
+- Solicita confirmação do usuário
+- Baixa e instala automaticamente a nova versão
+- Cria backup do binário anterior
+
+### Estrutura de Pacotes Expandida
+
+**Pacote updater/**: Sistema de atualização automática
+- Consulta GitHub Releases API
+- Download e extração de tar.gz
+- Substituição segura de binários com backup
+- Detecção automática de plataforma (OS/ARCH)
 
 ## Notas de Desenvolvimento
 

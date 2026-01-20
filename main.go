@@ -6,6 +6,7 @@ import (
 
 	"github.com/alexeiev/sshControl/cmd"
 	"github.com/alexeiev/sshControl/config"
+	"github.com/alexeiev/sshControl/updater"
 	"github.com/spf13/cobra"
 )
 
@@ -61,7 +62,18 @@ e gerenciamento de múltiplos hosts em paralelo.`,
 	Run: runCommand,
 }
 
+var updateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Atualiza o sshControl para a versão mais recente",
+	Long: `Verifica se há uma nova versão disponível no GitHub e
+atualiza automaticamente o binário para a versão mais recente.`,
+	Example: `  # Verifica e atualiza para a versão mais recente
+  sc update`,
+	Run: runUpdate,
+}
+
 func init() {
+	rootCmd.AddCommand(updateCmd)
 	rootCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
 	rootCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice, ex: production-jump ou 1)")
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
@@ -175,6 +187,49 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 
 	// Modo interativo (menu)
 	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost)
+}
+
+func runUpdate(cobraCmd *cobra.Command, args []string) {
+	fmt.Println()
+	fmt.Println("🔍 Verificando atualizações...")
+	fmt.Printf("Versão atual: %s\n", version)
+	fmt.Println()
+
+	u := updater.New(version)
+
+	release, hasUpdate, err := u.CheckForUpdates()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Erro ao verificar atualizações: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !hasUpdate {
+		fmt.Println("✅ Você já está usando a versão mais recente!")
+		return
+	}
+
+	fmt.Printf("📦 Nova versão disponível: %s\n", release.TagName)
+	fmt.Println()
+	fmt.Print("Deseja atualizar agora? [s/N]: ")
+
+	var response string
+	fmt.Scanln(&response)
+
+	if response != "s" && response != "S" {
+		fmt.Println("Atualização cancelada.")
+		return
+	}
+
+	fmt.Println()
+	fmt.Println("🚀 Iniciando atualização...")
+
+	if err := u.Update(release); err != nil {
+		fmt.Fprintf(os.Stderr, "\n❌ Erro ao atualizar: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println()
+	fmt.Println("Execute 'sc --version' para confirmar a nova versão.")
 }
 
 func main() {
