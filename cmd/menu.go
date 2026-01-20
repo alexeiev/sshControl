@@ -79,11 +79,12 @@ type model struct {
 	selectedHost   *config.Host
 	selectedSSHKey string
 	effectiveUser  string
+	version        string
 	quitting       bool
 }
 
 // ShowInteractive exibe o menu interativo usando bubbletea
-func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost) {
+func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost, version string) {
 	if len(cfg.Hosts) == 0 {
 		fmt.Println("Nenhum host configurado no arquivo config.yaml")
 		return
@@ -132,6 +133,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 		selectedUser: selectedUser,
 		jumpHost:     jumpHost,
 		allItems:     items,
+		version:      version,
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -245,8 +247,9 @@ func (m model) View() string {
 	}
 
 	banner := fmt.Sprintf(
-		"%s  |  SSH User: %s  |  Jump Host: %s  |  %s",
+		"%s %s  |  SSH User: %s  |  Jump Host: %s  |  %s",
 		titleStyle.Render("🚀 SSH Control"),
+		infoStyle.Render(fmt.Sprintf("v%s", m.version)),
 		sshUserInfo,
 		jumpHostStatus,
 		now.Format("02/01/2006 15:04:05"),

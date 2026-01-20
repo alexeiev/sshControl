@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/alexeiev/sshControl/cmd"
 	"github.com/alexeiev/sshControl/config"
@@ -83,6 +84,9 @@ func init() {
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
+	// Verifica atualizações em background (não bloqueante, com timeout de 2s)
+	checkForUpdatesBackground(version)
+
 	// Se a flag -v foi usada, exibe a versão e sai
 	if showVersion {
 		fmt.Printf("sshControl (sc) versão %s\n", version)
@@ -186,7 +190,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	}
 
 	// Modo interativo (menu)
-	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost)
+	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version)
 }
 
 func runUpdate(cobraCmd *cobra.Command, args []string) {
@@ -230,6 +234,47 @@ func runUpdate(cobraCmd *cobra.Command, args []string) {
 
 	fmt.Println()
 	fmt.Println("Execute 'sc --version' para confirmar a nova versão.")
+}
+
+// checkForUpdatesBackground verifica atualizações em background e notifica o usuário
+func checkForUpdatesBackground(currentVersion string) {
+	// Timeout de 2 segundos para não atrasar a execução
+	done := make(chan bool, 1)
+
+	go func() {
+		u := updater.New(currentVersion)
+		release, hasUpdate, err := u.CheckForUpdates()
+
+		// Ignora erros silenciosamente (network issues, etc)
+		if err != nil {
+			done <- true
+			return
+		}
+
+		// Se houver atualização, mostra notificação
+		if hasUpdate {
+			fmt.Fprintf(os.Stderr, "\n")
+			fmt.Fprintf(os.Stderr, "┌─────────────────────────────────────────────────────────────┐\n")
+			fmt.Fprintf(os.Stderr, "│  🔔 Nova versão disponível: %-30s  │\n", release.TagName)
+			fmt.Fprintf(os.Stderr, "│  Versão atual: %-44s │\n", currentVersion)
+			fmt.Fprintf(os.Stderr, "│                                                             │\n")
+			fmt.Fprintf(os.Stderr, "│  Para atualizar, execute:                                   │\n")
+			fmt.Fprintf(os.Stderr, "│    sc update                                                │\n")
+			fmt.Fprintf(os.Stderr, "│    (ou 'sudo sc update' se necessário)                      │\n")
+			fmt.Fprintf(os.Stderr, "└─────────────────────────────────────────────────────────────┘\n")
+			fmt.Fprintf(os.Stderr, "\n")
+		}
+
+		done <- true
+	}()
+
+	// Aguarda até 2 segundos
+	select {
+	case <-done:
+		return
+	case <-time.After(2 * time.Second):
+		return
+	}
 }
 
 func main() {
