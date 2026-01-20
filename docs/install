@@ -30,19 +30,19 @@ NC='\033[0m' # No Color
 
 # Funções auxiliares
 print_info() {
-    echo -e "${BLUE}ℹ️  ${1}${NC}"
+    echo -e "${BLUE}ℹ️  ${1}${NC}" >&2
 }
 
 print_success() {
-    echo -e "${GREEN}✅ ${1}${NC}"
+    echo -e "${GREEN}✅ ${1}${NC}" >&2
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠️  ${1}${NC}"
+    echo -e "${YELLOW}⚠️  ${1}${NC}" >&2
 }
 
 print_error() {
-    echo -e "${RED}❌ ${1}${NC}"
+    echo -e "${RED}❌ ${1}${NC}" >&2
 }
 
 # Detecta sistema operacional
@@ -222,11 +222,11 @@ main() {
         esac
     done
 
-    echo ""
+    echo "" >&2
     print_info "======================================"
     print_info "   Instalador do sshControl (sc)"
     print_info "======================================"
-    echo ""
+    echo "" >&2
 
     # Verifica dependências
     check_dependencies
@@ -242,24 +242,24 @@ main() {
     # Instala
     install_binary "$VERSION" "$OS" "$ARCH" "$INSTALL_DIR"
 
-    echo ""
+    echo "" >&2
     print_info "======================================"
 
     # Verifica instalação
     if verify_installation "$INSTALL_DIR"; then
-        echo ""
+        echo "" >&2
         print_info "Próximos passos:"
         print_info "  1. Execute 'sc --help' para ver os comandos disponíveis"
         print_info "  2. Configure seus hosts em ~/.sshControl/config.yaml"
         print_info "  3. Execute 'sc' para iniciar o modo interativo"
-        echo ""
+        echo "" >&2
         print_success "Instalação bem-sucedida! 🎉"
     else
         exit 1
     fi
 
     print_info "======================================"
-    echo ""
+    echo "" >&2
 }
 
 # Executa
