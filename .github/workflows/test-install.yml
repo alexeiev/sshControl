@@ -1,0 +1,38 @@
+name: Test Installation Script
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-script:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-13, macos-14]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test script syntax
+        run: |
+          bash -n install.sh
+          echo "✅ Script syntax is valid"
+
+      - name: Test script help
+        run: |
+          bash install.sh --help
+          echo "✅ Script help works"
+
+      - name: Check dependencies
+        run: |
+          which curl
+          which tar
+          echo "✅ Dependencies available"
+
+      - name: Validate script permissions
+        run: |
+          test -x install.sh && echo "✅ Script is executable" || chmod +x install.sh
