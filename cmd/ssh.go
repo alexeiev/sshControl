@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ceiev/sshControl/config"
+	"github.com/alexeiev/sshControl/config"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )

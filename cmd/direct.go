@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/ceiev/sshControl/config"
+	"github.com/alexeiev/sshControl/config"
 )
 
 // Connect processa a conexão direta com um host

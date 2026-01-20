@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ceiev/sshControl/config"
+	"github.com/alexeiev/sshControl/config"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"

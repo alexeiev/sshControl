@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ceiev/sshControl/config"
+	"github.com/alexeiev/sshControl/config"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )

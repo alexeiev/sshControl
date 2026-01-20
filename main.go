@@ -4,17 +4,24 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ceiev/sshControl/cmd"
-	"github.com/ceiev/sshControl/config"
+	"github.com/alexeiev/sshControl/cmd"
+	"github.com/alexeiev/sshControl/config"
 	"github.com/spf13/cobra"
 )
 
 var (
+	// Informações de versão (injetadas durante o build via ldflags)
+	version   = "dev"
+	buildDate = "unknown"
+	gitCommit = "unknown"
+
+	// Flags do CLI
 	username      string
 	jumpHost      string
 	command       string
 	multipleHosts bool
 	showServers   bool
+	showVersion   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -60,9 +67,18 @@ func init() {
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
 	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (requer -c)")
 	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista jump hosts e servidores cadastrados no config")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Exibe a versão do sshControl")
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
+	// Se a flag -v foi usada, exibe a versão e sai
+	if showVersion {
+		fmt.Printf("sshControl (sc) versão %s\n", version)
+		fmt.Printf("Build: %s\n", buildDate)
+		fmt.Printf("Commit: %s\n", gitCommit)
+		return
+	}
+
 	// Inicializa o diretório de configuração e obtém o caminho do arquivo
 	configPath, err := config.InitializeConfigDir()
 	if err != nil {

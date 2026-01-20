@@ -10,18 +10,34 @@ sshControl (`sc`) é um gerenciador de conexões SSH escrito em Go que oferece m
 
 ```bash
 # Compila binários para Linux (amd64) e macOS (arm64)
+# Injeta automaticamente informações de versão usando git
 make build
 
 # Binários gerados em:
 # - bin/amd64/sc (Linux)
 # - bin/arm64/sc (macOS)
 
-# Execução direta durante desenvolvimento
+# Build com versão customizada
+VERSION=v1.0.0 make build
+
+# Execução direta durante desenvolvimento (sem injeção de versão)
 go run .
 
 ```
 
+O Makefile injeta automaticamente as seguintes informações durante o build:
+- **version**: Obtida via `git describe --tags --always --dirty` (ou "dev" se não houver git)
+- **buildDate**: Data e hora do build em formato UTC
+- **gitCommit**: Hash curto do commit atual
+
 ## Exemplos de Uso
+
+### Informações do Sistema
+```bash
+# Exibe a versão do sshControl
+sc -v
+sc --version
+```
 
 ### Listagem de Jump Hosts e Servidores
 ```bash
@@ -147,6 +163,7 @@ hosts:
 ### Estrutura de Pacotes
 
 **main.go**: Ponto de entrada que gerencia flags CLI e roteamento usando Cobra:
+- `-v, --version`: Exibe a versão do sshControl, data de build e commit hash
 - `-u, --user <username>`: Especifica qual usuário do config usar
 - `-j, --jump <jump_host>`: Especifica qual jump host usar (nome ou índice, ex: production-jump ou 1)
 - `-c, --command "<comando>"`: Executa comando remoto (requer especificar host)
