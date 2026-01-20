@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Página não encontrada | sshControl</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .error-page {
+            text-align: center;
+            padding: 100px 20px;
+        }
+        .error-code {
+            font-size: 8rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+        }
+        .error-message {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-page">
+            <div class="error-code">404</div>
+            <h1>Página não encontrada</h1>
+            <p class="error-message">A página que você está procurando não existe.</p>
+            <div class="link-buttons">
+                <a href="/" class="btn btn-primary">🏠 Voltar para Home</a>
+                <a href="https://github.com/alexeiev/sshControl" class="btn btn-secondary" target="_blank">📁 GitHub</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

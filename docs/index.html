@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="sshControl - Gerenciador de conexões SSH com interface interativa (TUI) e modo CLI direto">
+    <meta name="keywords" content="ssh, terminal, cli, tui, jump host, bastion, devops">
+    <title>sshControl - Gerenciador de Conexões SSH</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 sshControl</h1>
+            <p class="tagline">Gerenciador de conexões SSH com interface interativa</p>
+        </header>
+
+        <section class="hero">
+            <div class="install-box">
+                <h2>Instalação Rápida</h2>
+                <div class="command-box">
+                    <code>curl -fsSL https://sshcontrol.alexeiev.me/install | bash</code>
+                    <button onclick="copyToClipboard()" class="copy-btn" title="Copiar comando">
+                        📋
+                    </button>
+                </div>
+                <p class="install-note">Suporta Linux e macOS (Intel e Apple Silicon)</p>
+            </div>
+        </section>
+
+        <section class="features">
+            <h2>Características</h2>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">🖥️</div>
+                    <h3>Modo Interativo (TUI)</h3>
+                    <p>Interface visual elegante para navegar e selecionar hosts</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Modo Direto</h3>
+                    <p>Conecte rapidamente via linha de comando</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔗</div>
+                    <h3>Jump Hosts</h3>
+                    <p>Suporte completo para conexões via bastion/jump hosts</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📦</div>
+                    <h3>Execução em Lote</h3>
+                    <p>Execute comandos em múltiplos hosts simultaneamente</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔐</div>
+                    <h3>Autenticação Flexível</h3>
+                    <p>Suporte para chaves SSH, SSH Agent e senha</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Auto-Atualização</h3>
+                    <p>Atualize para a versão mais recente com um comando</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="usage">
+            <h2>Exemplos de Uso</h2>
+            <div class="example-grid">
+                <div class="example">
+                    <h4>Modo Interativo</h4>
+                    <pre><code>sc</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Conexão Direta</h4>
+                    <pre><code>sc webserver
+sc 192.168.1.50
+sc ubuntu@host:2222</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Via Jump Host</h4>
+                    <pre><code>sc -j production-jump webserver
+sc -j 1 webserver</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Comando Remoto</h4>
+                    <pre><code>sc -c "uptime" webserver</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Múltiplos Hosts</h4>
+                    <pre><code>sc -c "df -h" -l web1 web2 web3</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Atualização</h4>
+                    <pre><code>sc update</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section class="links">
+            <h2>Links</h2>
+            <div class="link-buttons">
+                <a href="https://github.com/alexeiev/sshControl" class="btn btn-primary" target="_blank">
+                    📁 GitHub
+                </a>
+                <a href="https://github.com/alexeiev/sshControl/releases" class="btn btn-secondary" target="_blank">
+                    📦 Releases
+                </a>
+                <a href="https://github.com/alexeiev/sshControl/blob/main/README.md" class="btn btn-secondary" target="_blank">
+                    📖 Documentação
+                </a>
+                <a href="https://github.com/alexeiev/sshControl/issues" class="btn btn-secondary" target="_blank">
+                    🐛 Issues
+                </a>
+            </div>
+        </section>
+
+        <section class="manual-install">
+            <h2>Outras Opções de Instalação</h2>
+            <div class="install-options">
+                <div class="option">
+                    <h4>Instalação Manual</h4>
+                    <p>Baixe o binário pré-compilado das <a href="https://github.com/alexeiev/sshControl/releases/latest">releases</a></p>
+                </div>
+                <div class="option">
+                    <h4>Compilar do Código</h4>
+                    <pre><code>git clone https://github.com/alexeiev/sshControl.git
+cd sshControl
+make build</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>
+                Desenvolvido por <a href="https://github.com/alexeiev" target="_blank">alexeiev</a>
+                | Licença GPL-3.0
+                | <a href="https://github.com/alexeiev/sshControl">Código Fonte</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        function copyToClipboard() {
+            const command = 'curl -fsSL https://sshcontrol.alexeiev.me/install | bash';
+            navigator.clipboard.writeText(command).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = '✅';
+                setTimeout(() => {
+                    btn.textContent = '📋';
+                }, 2000);
+            }).catch(err => {
+                console.error('Erro ao copiar:', err);
+            });
+        }
+    </script>
+</body>
+</html>
