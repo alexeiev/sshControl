@@ -259,7 +259,7 @@ O GitHub Actions automaticamente:
 
 ## Licença
 
-[Especifique sua licença aqui]
+Este projeto é distribuído sob a licença GPL-3.0. Veja o arquivo [LICENSE](https://github.com/alexeiev/sshControl/blob/main/LICENSE) para mais detalhes.
 
 ## Contribuindo
 
