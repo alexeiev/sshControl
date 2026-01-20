@@ -210,6 +210,8 @@ sc --version
 
 # Atualizar para versão mais recente
 sc update
+# Ou com sudo se instalado em /usr/local/bin
+sudo sc update
 
 # Ajuda
 sc --help
@@ -266,15 +268,21 @@ Exibe resultados organizados com:
 ### Auto-Atualização
 
 ```bash
+# Atualizar (pode precisar de sudo se instalado em /usr/local/bin)
 sc update
+# ou
+sudo sc update
 ```
 
 O comando:
 1. Verifica a última versão no GitHub
 2. Compara com a versão atual
-3. Baixa o binário apropriado para seu OS/arquitetura
-4. Substitui o binário atual (com backup)
-5. Confirma a atualização
+3. Solicita confirmação do usuário
+4. Baixa o binário apropriado para seu OS/arquitetura
+5. Substitui o binário atual (com backup)
+6. Confirma a atualização
+
+**Nota**: Se o sshControl foi instalado em `/usr/local/bin`, você precisará usar `sudo sc update`. Se instalou em um diretório pessoal (como `~/.local/bin`), não precisa de sudo.
 
 ## Desenvolvimento
 

@@ -208,9 +208,19 @@ func (u *Updater) replaceBinary(newBinaryPath string) error {
 		return fmt.Errorf("erro ao resolver symlinks: %w", err)
 	}
 
+	// Verifica se temos permissão de escrita no diretório
+	dir := filepath.Dir(currentBinaryPath)
+	if !hasWritePermission(dir) {
+		return fmt.Errorf("permissão negada para atualizar %s\n\nPara atualizar, execute com sudo:\n  sudo sc update", currentBinaryPath)
+	}
+
 	// Cria backup do binário atual
 	backupPath := currentBinaryPath + ".backup"
 	if err := os.Rename(currentBinaryPath, backupPath); err != nil {
+		// Verifica se é erro de permissão
+		if os.IsPermission(err) {
+			return fmt.Errorf("permissão negada para atualizar %s\n\nPara atualizar, execute com sudo:\n  sudo sc update", currentBinaryPath)
+		}
 		return fmt.Errorf("erro ao criar backup: %w", err)
 	}
 
@@ -230,6 +240,19 @@ func (u *Updater) replaceBinary(newBinaryPath string) error {
 	os.Remove(backupPath)
 
 	return nil
+}
+
+// hasWritePermission verifica se temos permissão de escrita no diretório
+func hasWritePermission(dir string) bool {
+	// Tenta criar um arquivo temporário no diretório
+	testFile := filepath.Join(dir, ".sc-write-test")
+	f, err := os.Create(testFile)
+	if err != nil {
+		return false
+	}
+	f.Close()
+	os.Remove(testFile)
+	return true
 }
 
 // copyFile copia um arquivo

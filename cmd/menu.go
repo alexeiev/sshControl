@@ -246,7 +246,7 @@ func (m model) View() string {
 
 	banner := fmt.Sprintf(
 		"%s  |  SSH User: %s  |  Jump Host: %s  |  %s",
-		titleStyle.Render("🚀 SSH Manager"),
+		titleStyle.Render("🚀 SSH Control"),
 		sshUserInfo,
 		jumpHostStatus,
 		now.Format("02/01/2006 15:04:05"),
