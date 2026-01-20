@@ -125,7 +125,7 @@ install_binary() {
     trap "rm -rf $tmp_dir" EXIT
 
     # Baixa o arquivo
-    if ! curl -fL "$download_url" -o "$tmp_dir/$filename"; then
+    if ! curl -fsSL "$download_url" -o "$tmp_dir/$filename" >&-; then
         print_error "Falha ao baixar o binário"
         exit 1
     fi
