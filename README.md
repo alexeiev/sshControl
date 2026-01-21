@@ -1,5 +1,11 @@
 # sshControl (sc)
 
+[![Latest Release](https://img.shields.io/github/v/release/alexeiev/sshControl?label=version&color=blue)](https://github.com/alexeiev/sshControl/releases/latest)
+[![License](https://img.shields.io/github/license/alexeiev/sshControl?color=green)](https://github.com/alexeiev/sshControl/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/alexeiev/sshControl)](https://go.dev/)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/alexeiev/sshControl/release.yml?branch=main)](https://github.com/alexeiev/sshControl/actions)
+[![Downloads](https://img.shields.io/github/downloads/alexeiev/sshControl/total?color=orange)](https://github.com/alexeiev/sshControl/releases)
+
 Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo CLI direto.
 
 ## Características
@@ -43,57 +49,6 @@ O script automaticamente:
 - Remove o atributo de quarentena no macOS (evita aviso de segurança)
 - Verifica se a instalação foi bem-sucedida
 
-### Instalação Manual
-
-Baixe o binário pré-compilado da [última release](https://github.com/alexeiev/sshControl/releases/latest):
-
-**Linux (amd64)**:
-```bash
-VERSION=$(curl -s https://api.github.com/repos/alexeiev/sshControl/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-curl -L "https://github.com/alexeiev/sshControl/releases/latest/download/sc-${VERSION}-linux-amd64.tar.gz" | tar xz
-sudo mv sc /usr/local/bin/
-sudo chmod +x /usr/local/bin/sc
-```
-
-**macOS (Apple Silicon)**:
-```bash
-VERSION=$(curl -s https://api.github.com/repos/alexeiev/sshControl/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-curl -L "https://github.com/alexeiev/sshControl/releases/latest/download/sc-${VERSION}-darwin-arm64.tar.gz" | tar xz
-sudo mv sc /usr/local/bin/
-sudo chmod +x /usr/local/bin/sc
-# Remove atributo de quarentena do macOS
-sudo xattr -d com.apple.quarantine /usr/local/bin/sc 2>/dev/null || true
-```
-
-**macOS (Intel)**:
-```bash
-VERSION=$(curl -s https://api.github.com/repos/alexeiev/sshControl/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-curl -L "https://github.com/alexeiev/sshControl/releases/latest/download/sc-${VERSION}-darwin-amd64.tar.gz" | tar xz
-sudo mv sc /usr/local/bin/
-sudo chmod +x /usr/local/bin/sc
-# Remove atributo de quarentena do macOS
-sudo xattr -d com.apple.quarantine /usr/local/bin/sc 2>/dev/null || true
-```
-
-### Problema de Segurança no macOS
-
-Se você baixar o binário manualmente no macOS, pode ver o aviso: **"Apple could not verify 'sc' is free of malware"**.
-
-Isso acontece porque o binário não está assinado com um certificado de desenvolvedor Apple. Existem duas soluções:
-
-**Solução 1: Use o script de instalação (recomendado)**
-O script automaticamente remove o atributo de quarentena.
-
-**Solução 2: Remova manualmente o atributo de quarentena**
-```bash
-sudo xattr -d com.apple.quarantine /usr/local/bin/sc
-```
-
-**Solução 3: Permita via System Settings**
-1. Tente executar `sc`
-2. Vá em System Settings → Privacy & Security
-3. Role até a mensagem sobre "sc"
-4. Clique em "Open Anyway"
 
 ### Compilar do Código Fonte
 
@@ -153,8 +108,14 @@ hosts:
 # Abre menu interativo
 sc
 
-# Menu com usuário específico
+# Menu com usuário específico (config.users[])
 sc -u admin
+
+# Menu com Jump Host
+sc -j production-jump
+
+# Menu com Proxy via SSH Reverso
+sc -p
 ```
 
 ### Conexão Direta
@@ -391,6 +352,10 @@ Contribuições são bem-vindas! Por favor:
 3. Commit suas mudanças
 4. Push para a branch
 5. Abra um Pull Request
+
+## Changelog
+
+Veja o [CHANGELOG.md](CHANGELOG.md) para o histórico detalhado de mudanças em cada versão.
 
 ## Suporte
 

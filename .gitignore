@@ -1,4 +1,5 @@
 bin/
 docs_int/
-!README.md
 *.md
+!README.md
+!CHANGELOG.md
