@@ -17,7 +17,7 @@ import (
 // 3. user@host: "ubuntu@192.168.1.50" (porta 22 por padrão)
 // 4. host:port: "192.168.1.50:22" (usa usuário especificado ou default)
 // 5. host: "192.168.1.50" (usa usuário especificado ou default e porta 22)
-func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string) {
+func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool) {
 	var hostname string
 	var port int
 	var sshKey string
@@ -71,6 +71,14 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 		jumpHostSSHKey = cfg.GetJumpHostSSHKey(jumpHost)
 	}
 
+	// Obtém configuração de proxy
+	proxyAddress, proxyPort, proxyConfigured := cfg.Config.GetProxyConfig()
+	proxyActive := proxyEnabled && proxyConfigured
+
+	if !proxyActive && proxyEnabled {
+		fmt.Fprintf(os.Stderr, "⚠️  Aviso: Proxy solicitado mas não configurado no config.yaml\n")
+	}
+
 	// Cria e executa a conexão SSH
 	sshConn := NewSSHConnection(
 		username,
@@ -81,6 +89,9 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 		jumpHost,
 		jumpHostSSHKey,
 		command,
+		proxyActive,
+		proxyAddress,
+		proxyPort,
 	)
 
 	// Decide se executa comando remoto ou inicia sessão interativa

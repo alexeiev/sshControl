@@ -22,12 +22,20 @@ type HostResult struct {
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
-func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string) {
+func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool) {
 	// Determina o usuário efetivo
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
 	if effectiveUser == nil {
 		fmt.Fprintf(os.Stderr, "Erro: Nenhum usuário configurado\n")
 		os.Exit(1)
+	}
+
+	// Obtém configuração de proxy uma vez
+	proxyAddress, proxyPort, proxyConfigured := cfg.Config.GetProxyConfig()
+	proxyActive := proxyEnabled && proxyConfigured
+
+	if !proxyActive && proxyEnabled {
+		fmt.Fprintf(os.Stderr, "⚠️  Aviso: Proxy solicitado mas não configurado no config.yaml\n\n")
 	}
 
 	fmt.Println()
@@ -63,7 +71,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 		wg.Add(1)
 		go func(hostArg string) {
 			defer wg.Done()
-			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command)
+			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command, proxyActive, proxyAddress, proxyPort)
 			results <- result
 		}(hostArg)
 	}
@@ -88,7 +96,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
-func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string) HostResult {
+func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int) HostResult {
 	var hostname string
 	var port int
 	var sshKey string
@@ -146,6 +154,9 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		jumpHost,
 		jumpHostSSHKey,
 		command,
+		proxyEnabled,
+		proxyAddress,
+		proxyPort,
 	)
 
 	// Executa o comando e captura a saída

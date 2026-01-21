@@ -81,10 +81,11 @@ type model struct {
 	effectiveUser  string
 	version        string
 	quitting       bool
+	proxyEnabled   bool
 }
 
 // ShowInteractive exibe o menu interativo usando bubbletea
-func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost, version string) {
+func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost, version string, proxyEnabled bool) {
 	if len(cfg.Hosts) == 0 {
 		fmt.Println("Nenhum host configurado no arquivo config.yaml")
 		return
@@ -134,6 +135,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 		jumpHost:     jumpHost,
 		allItems:     items,
 		version:      version,
+		proxyEnabled: proxyEnabled,
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -151,6 +153,14 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 			jumpHostSSHKey = m.cfg.GetJumpHostSSHKey(m.jumpHost)
 		}
 
+		// Obtém configuração de proxy
+		proxyAddress, proxyPort, proxyConfigured := m.cfg.Config.GetProxyConfig()
+		proxyActive := m.proxyEnabled && proxyConfigured
+
+		if !proxyActive && m.proxyEnabled {
+			fmt.Fprintf(os.Stderr, "⚠️  Aviso: Proxy solicitado mas não configurado no config.yaml\n")
+		}
+
 		sshConn := NewSSHConnection(
 			m.effectiveUser,
 			m.selectedHost.Host,
@@ -160,6 +170,9 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 			m.jumpHost,
 			jumpHostSSHKey,
 			"", // Modo interativo não executa comandos remotos
+			proxyActive,
+			proxyAddress,
+			proxyPort,
 		)
 
 		if err := sshConn.Connect(); err != nil {
@@ -246,12 +259,22 @@ func (m model) View() string {
 		jumpHostStatus = jumpHostEnabledStyle.Render(m.jumpHost.Name)
 	}
 
+	// Status do Proxy
+	_, proxyPort, proxyConfigured := m.cfg.Config.GetProxyConfig()
+	proxyStatus := jumpHostDisabledStyle.Render("FALSE")
+	if m.proxyEnabled && proxyConfigured {
+		proxyStatus = jumpHostEnabledStyle.Render(fmt.Sprintf("TRUE (:%d)", proxyPort))
+	} else if m.proxyEnabled && !proxyConfigured {
+		proxyStatus = infoStyle.Render("Not Configured")
+	}
+
 	banner := fmt.Sprintf(
-		"%s %s  |  SSH User: %s  |  Jump Host: %s  |  %s",
+		"%s %s  |  SSH User: %s  |  Jump Host: %s  |  Proxy: %s  |  %s",
 		titleStyle.Render("🚀 SSH Control"),
 		infoStyle.Render(fmt.Sprintf("%s", m.version)),
 		sshUserInfo,
 		jumpHostStatus,
+		proxyStatus,
 		now.Format("02/01/2006 15:04:05"),
 	)
 

@@ -1,2 +1,4 @@
 bin/
 docs_int/
+!README.md
+*.md

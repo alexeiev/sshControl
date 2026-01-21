@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -22,6 +23,9 @@ type SSHConnection struct {
 	JumpHost       *config.JumpHost
 	JumpHostSSHKey string
 	Command        string
+	ProxyEnabled   bool
+	ProxyAddress   string
+	ProxyPort      int
 }
 
 // Connect estabelece uma conexão SSH interativa
@@ -44,6 +48,17 @@ func (s *SSHConnection) Connect() error {
 		return fmt.Errorf("erro ao conectar: %w", err)
 	}
 	defer client.Close()
+
+	// Configura remote forwarding se proxy estiver habilitado
+	if s.ProxyEnabled {
+		if err := s.setupRemoteForwarding(client); err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Aviso: Não foi possível configurar proxy forwarding: %v\n", err)
+		} else {
+			fmt.Printf("\n✅ Proxy tunnel ativo!\n")
+			fmt.Printf("   Execute no host remoto:\n")
+			fmt.Printf("   export {https,http,ftp}_proxy=http://127.0.0.1:%d\n\n", s.ProxyPort)
+		}
+	}
 
 	// Cria uma sessão SSH
 	session, err := client.NewSession()
@@ -303,6 +318,49 @@ func (a *SSHAgentClient) Signers() ([]ssh.Signer, error) {
 	return nil, nil
 }
 
+// setupRemoteForwarding configura o tunnel SSH reverso para o proxy
+func (s *SSHConnection) setupRemoteForwarding(client *ssh.Client) error {
+	// Remote forwarding: host remoto porta ProxyPort -> proxy local ProxyAddress
+	remoteAddr := fmt.Sprintf("127.0.0.1:%d", s.ProxyPort)
+
+	listener, err := client.Listen("tcp", remoteAddr)
+	if err != nil {
+		return fmt.Errorf("erro ao criar listener remoto: %w", err)
+	}
+
+	// Goroutine para aceitar conexões e fazer forwarding
+	go func() {
+		defer listener.Close()
+		for {
+			remoteConn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			// Para cada conexão remota, conecta ao proxy local
+			go s.handleProxyForwarding(remoteConn)
+		}
+	}()
+
+	return nil
+}
+
+// handleProxyForwarding encaminha o tráfego entre a conexão remota e o proxy local
+func (s *SSHConnection) handleProxyForwarding(remoteConn net.Conn) {
+	defer remoteConn.Close()
+
+	// Conecta ao proxy local
+	proxyConn, err := net.Dial("tcp", s.ProxyAddress)
+	if err != nil {
+		return
+	}
+	defer proxyConn.Close()
+
+	// Copia dados bidirecional
+	go io.Copy(proxyConn, remoteConn)
+	io.Copy(remoteConn, proxyConn)
+}
+
 // formatConnectionString formata a string de conexão para exibição
 func (s *SSHConnection) formatConnectionString() string {
 	conn := fmt.Sprintf("%s@%s", s.User, s.Host)
@@ -319,11 +377,15 @@ func (s *SSHConnection) formatConnectionString() string {
 		conn += fmt.Sprintf(" via %s (%s@%s:%d)", s.JumpHost.Name, s.JumpHost.User, s.JumpHost.Host, s.JumpHost.Port)
 	}
 
+	if s.ProxyEnabled {
+		conn += fmt.Sprintf(" [Proxy: %s via :%d]", s.ProxyAddress, s.ProxyPort)
+	}
+
 	return conn
 }
 
 // NewSSHConnection cria uma nova conexão SSH
-func NewSSHConnection(user, host string, port int, sshKey, password string, jumpHost *config.JumpHost, jumpHostSSHKey string, command string) *SSHConnection {
+func NewSSHConnection(user, host string, port int, sshKey, password string, jumpHost *config.JumpHost, jumpHostSSHKey string, command string, proxyEnabled bool, proxyAddress string, proxyPort int) *SSHConnection {
 	return &SSHConnection{
 		User:           user,
 		Host:           host,
@@ -333,5 +395,8 @@ func NewSSHConnection(user, host string, port int, sshKey, password string, jump
 		JumpHost:       jumpHost,
 		JumpHostSSHKey: jumpHostSSHKey,
 		Command:        command,
+		ProxyEnabled:   proxyEnabled,
+		ProxyAddress:   proxyAddress,
+		ProxyPort:      proxyPort,
 	}
 }

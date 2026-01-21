@@ -7,6 +7,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🚀 **Modo Interativo (TUI)**: Menu visual para seleção de hosts
 - ⚡ **Modo Direto**: Conecte rapidamente via linha de comando
 - 🔗 **Jump Hosts**: Suporte completo para conexões via bastion/jump hosts
+- 🌐 **Proxy Reverso**: Compartilhe proxy HTTP/HTTPS/FTP da máquina local com hosts remotos
 - 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente
 - 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
@@ -112,6 +113,8 @@ Na primeira execução, o sshControl cria automaticamente o arquivo de configura
 ```yaml
 config:
   default_user: ubuntu
+  proxy: "192.168.0.1:3128"  # IP:PORT do proxy HTTP/HTTPS/FTP na máquina local
+  proxy_port: 9999            # Porta local no host remoto para acessar o proxy
   users:
     - name: ubuntu
       ssh_keys:
@@ -171,6 +174,12 @@ sc -j production-jump webserver
 
 # Via jump host (por índice)
 sc -j 1 webserver
+
+# Com proxy reverso habilitado
+sc -p webserver
+
+# Com jump host e proxy
+sc -j production-jump -p webserver
 ```
 
 ### Execução de Comandos
@@ -243,6 +252,52 @@ sc -j production-jump webserver
 # Por índice
 sc -j 1 webserver
 ```
+
+### Proxy Reverso
+
+O sshControl permite compartilhar um proxy HTTP/HTTPS/FTP da sua máquina local com hosts remotos através de um tunnel SSH reverso. Isso é útil quando hosts remotos não têm acesso direto à internet mas precisam acessar recursos externos.
+
+**Configuração do Proxy**:
+
+```yaml
+config:
+  proxy: "192.168.0.1:3128"  # Endereço do proxy na máquina local
+  proxy_port: 9999            # Porta que será aberta no host remoto
+```
+
+**Como Usar**:
+
+```bash
+# Conectar com proxy habilitado
+sc -p webserver
+
+# Com jump host e proxy
+sc -j production-jump -p app-server
+
+# Modo interativo com proxy
+sc -p
+```
+
+**No Host Remoto**:
+
+Após conectar com `-p`, configure as variáveis de ambiente para usar o proxy:
+
+```bash
+export https_proxy=http://127.0.0.1:9999
+export http_proxy=http://127.0.0.1:9999
+export ftp_proxy=http://127.0.0.1:9999
+
+# ou apenas
+export {https,http,ftp}_proxy=http://127.0.0.1:9999
+
+# Testar
+curl -I http://google.com
+```
+
+**Importante**:
+- O tunnel permanece ativo durante toda a sessão SSH
+- Com jump host, o proxy é configurado apenas no host final (target), não no jump host
+- O proxy deve estar acessível a partir da máquina onde você executa o `sc`
 
 ### Autenticação
 
