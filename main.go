@@ -28,7 +28,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "sc [host]",
+	Use:   "sc [flags] [host]",
 	Short: "sshControl - Gerenciador de conexões SSH",
 	Long: `sshControl (sc) é um gerenciador de conexões SSH que oferece modos
 interativo (TUI) e CLI direto para gerenciar conexões SSH.
