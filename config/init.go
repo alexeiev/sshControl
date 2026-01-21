@@ -19,6 +19,8 @@ const (
 const defaultConfigTemplate = `---
 config:
   default_user: ubuntu
+  proxy: "192.168.0.1:3128"  # IP:PORT do proxy HTTP/HTTPS/FTP na máquina local
+  proxy_port: 9999            # Porta local no host remoto para acessar o proxy
   users:
     - name: ubuntu
       ssh_keys:

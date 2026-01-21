@@ -27,6 +27,8 @@ type Config struct {
 	DefaultUser string     `yaml:"default_user"`
 	User        []User     `yaml:"users"`
 	JumpHosts   []JumpHost `yaml:"jump_hosts"`
+	Proxy       string     `yaml:"proxy"`      // IP:PORT do proxy (ex: 10.0.230.100:8080)
+	ProxyPort   int        `yaml:"proxy_port"` // Porta local no host remoto (ex: 9999)
 }
 
 // Host representa um host SSH
@@ -65,6 +67,20 @@ func (c *ConfigFile) FindUser(name string) *User {
 		}
 	}
 	return nil
+}
+
+// GetProxyConfig retorna a configuração de proxy validada
+func (c *Config) GetProxyConfig() (address string, port int, configured bool) {
+	if c.Proxy == "" {
+		return "", 0, false
+	}
+
+	port = c.ProxyPort
+	if port == 0 {
+		port = 9999 // porta padrão
+	}
+
+	return c.Proxy, port, true
 }
 
 // GetDefaultUser retorna o primeiro usuário da configuração

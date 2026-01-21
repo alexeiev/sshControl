@@ -24,6 +24,7 @@ var (
 	multipleHosts bool
 	showServers   bool
 	showVersion   bool
+	proxyEnabled  bool
 )
 
 var rootCmd = &cobra.Command{
@@ -47,6 +48,11 @@ e gerenciamento de múltiplos hosts em paralelo.`,
   sc -j production-jump webserver
   sc -j 1 webserver
   sc -j staging-jump 192.168.1.50
+
+  # Com proxy reverso (compartilha proxy local com host remoto)
+  sc -p webserver
+  sc -j production-jump -p app-server
+  sc -p  # Modo interativo com proxy
 
   # Executar comando remoto em host único
   sc -c "uptime" webserver
@@ -82,6 +88,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (requer -c)")
 	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista jump hosts e servidores cadastrados no config")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Exibe a versão do sshControl")
+	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
@@ -172,14 +179,14 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
 			os.Exit(1)
 		}
-		cmd.ConnectMultiple(cfg, args, selectedUser, selectedJumpHost, command)
+		cmd.ConnectMultiple(cfg, args, selectedUser, selectedJumpHost, command, proxyEnabled)
 		return
 	}
 
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, hostArg, selectedUser, selectedJumpHost, command)
+		cmd.Connect(cfg, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled)
 		return
 	}
 
@@ -191,7 +198,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	}
 
 	// Modo interativo (menu)
-	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version)
+	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version, proxyEnabled)
 }
 
 func runUpdate(cobraCmd *cobra.Command, args []string) {
