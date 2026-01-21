@@ -60,7 +60,8 @@ e gerenciamento de múltiplos hosts em paralelo.`,
 
   # Listar jump hosts e servidores cadastrados
   sc -s`,
-	Run: runCommand,
+	Args: cobra.ArbitraryArgs,
+	Run:  runCommand,
 }
 
 var updateCmd = &cobra.Command{
