@@ -238,6 +238,9 @@ func (s *SSHConnection) ExecuteCommandWithOutput() (output string, exitCode int,
 	}
 	defer client.Close()
 
+	// Tenta instalar a chave pública se necessário (não bloqueia em caso de erro)
+	_ = s.installPublicKeyIfNeeded(client)
+
 	// Cria uma sessão SSH
 	session, err := client.NewSession()
 	if err != nil {
