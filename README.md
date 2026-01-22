@@ -3,7 +3,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/alexeiev/sshControl?label=version&color=blue)](https://github.com/alexeiev/sshControl/releases/latest)
 [![License](https://img.shields.io/github/license/alexeiev/sshControl?color=green)](https://github.com/alexeiev/sshControl/blob/main/LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/alexeiev/sshControl)](https://go.dev/)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/alexeiev/sshControl/release.yml?branch=main)](https://github.com/alexeiev/sshControl/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/alexeiev/sshControl/release.yml?branch%3Amain)](https://github.com/alexeiev/sshControl/actions)
 [![Downloads](https://img.shields.io/github/downloads/alexeiev/sshControl/total?color=orange)](https://github.com/alexeiev/sshControl/releases)
 
 Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo CLI direto.
