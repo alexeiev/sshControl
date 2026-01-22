@@ -8,6 +8,13 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [Unreleased]
 
 ### Added
+
+- Adicionado a funcionalidade de copiar a chave pública para o servidor que ainda não tem.  
+
+## [0.2.1] - 2026-01-22
+
+### Added
+
 - Suporte a tunnel SSH reverso para compartilhar proxy HTTP/HTTPS/FTP (`-p, --proxy`)
 - Configuração de proxy no `config.yaml` (campos `proxy` e `proxy_port`)
 - Status do proxy exibido no banner da TUI

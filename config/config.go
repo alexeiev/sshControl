@@ -56,6 +56,14 @@ func LoadConfig(filename string) (*ConfigFile, error) {
 		return nil, fmt.Errorf("erro ao parsear YAML: %w", err)
 	}
 
+	// Valida pares de chaves SSH para todos os usuários
+	for i := range cfg.Config.User {
+		warnings := ValidateSSHKeyPairs(&cfg.Config.User[i])
+		for _, warning := range warnings {
+			fmt.Fprintf(os.Stderr, "⚠️  Aviso: %s\n", warning)
+		}
+	}
+
 	return &cfg, nil
 }
 
@@ -196,4 +204,34 @@ func ExpandHomePath(path string) string {
 		return home + path[1:]
 	}
 	return path
+}
+
+// fileExists verifica se um arquivo existe
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// ValidateSSHKeyPairs valida se existem arquivos .pub correspondentes às chaves privadas
+// Retorna uma lista de avisos para chaves sem par público
+func ValidateSSHKeyPairs(user *User) []string {
+	var warnings []string
+
+	for _, keyPath := range user.SSHKeys {
+		expandedKeyPath := ExpandHomePath(keyPath)
+
+		// Verifica se a chave privada existe
+		if !fileExists(expandedKeyPath) {
+			warnings = append(warnings, fmt.Sprintf("Chave privada não encontrada para usuário '%s': %s", user.Name, keyPath))
+			continue
+		}
+
+		// Verifica se o arquivo .pub correspondente existe
+		pubKeyPath := expandedKeyPath + ".pub"
+		if !fileExists(pubKeyPath) {
+			warnings = append(warnings, fmt.Sprintf("Chave pública não encontrada para usuário '%s': %s.pub (auto-instalação desabilitada)", user.Name, keyPath))
+		}
+	}
+
+	return warnings
 }

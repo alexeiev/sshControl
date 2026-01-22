@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -49,6 +50,12 @@ func (s *SSHConnection) Connect() error {
 	}
 	defer client.Close()
 
+	// Tenta instalar a chave pública se necessário
+	if err := s.installPublicKeyIfNeeded(client); err != nil {
+		// Log warning mas não bloqueia
+		fmt.Fprintf(os.Stderr, "⚠️  Aviso: Não foi possível instalar chave pública: %v\n", err)
+	}
+
 	// Configura remote forwarding se proxy estiver habilitado
 	if s.ProxyEnabled {
 		if err := s.setupRemoteForwarding(client); err != nil {
@@ -96,6 +103,12 @@ func (s *SSHConnection) ExecuteCommand() error {
 		return fmt.Errorf("erro ao conectar: %w", err)
 	}
 	defer client.Close()
+
+	// Tenta instalar a chave pública se necessário
+	if err := s.installPublicKeyIfNeeded(client); err != nil {
+		// Log warning mas não bloqueia
+		fmt.Fprintf(os.Stderr, "⚠️  Aviso: Não foi possível instalar chave pública: %v\n", err)
+	}
 
 	// Cria uma sessão SSH
 	session, err := client.NewSession()
@@ -382,6 +395,88 @@ func (s *SSHConnection) formatConnectionString() string {
 	}
 
 	return conn
+}
+
+// readPublicKey lê o conteúdo do arquivo de chave pública correspondente à chave privada
+func readPublicKey(privateKeyPath string) (string, error) {
+	if privateKeyPath == "" {
+		return "", fmt.Errorf("caminho da chave privada está vazio")
+	}
+
+	pubKeyPath := privateKeyPath + ".pub"
+	content, err := os.ReadFile(pubKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("erro ao ler arquivo de chave pública %s: %w", pubKeyPath, err)
+	}
+
+	// Remove espaços em branco e quebras de linha no final
+	pubKey := string(content)
+	pubKey = string(bytes.TrimSpace([]byte(pubKey)))
+
+	if pubKey == "" {
+		return "", fmt.Errorf("arquivo de chave pública está vazio: %s", pubKeyPath)
+	}
+
+	return pubKey, nil
+}
+
+// installPublicKeyIfNeeded instala a chave pública no servidor remoto se ainda não estiver presente
+func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
+	// Se não há chave SSH configurada, não faz nada
+	if s.SSHKey == "" {
+		return nil
+	}
+
+	// Tenta ler a chave pública
+	pubKey, err := readPublicKey(s.SSHKey)
+	if err != nil {
+		// Se não conseguir ler a chave pública, apenas retorna erro informativo (não bloqueia)
+		return fmt.Errorf("chave pública não disponível: %w", err)
+	}
+
+	// Cria uma nova sessão para verificar/instalar a chave
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("erro ao criar sessão para instalação de chave: %w", err)
+	}
+	defer session.Close()
+
+	// Verifica se a chave já existe no authorized_keys
+	// Usa grep -Fxq para busca exata (Fixed string, eXact match, Quiet)
+	checkCmd := fmt.Sprintf("grep -Fxq %q ~/.ssh/authorized_keys 2>/dev/null", pubKey)
+	err = session.Run(checkCmd)
+
+	// Se exit code == 0, a chave já existe, não precisa instalar
+	if err == nil {
+		return nil
+	}
+
+	// Se o erro não é um exit error, algo deu errado
+	if _, ok := err.(*ssh.ExitError); !ok {
+		return fmt.Errorf("erro ao verificar chave existente: %w", err)
+	}
+
+	// Chave não existe, precisa instalar
+	// Cria nova sessão para instalação
+	installSession, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("erro ao criar sessão para instalação: %w", err)
+	}
+	defer installSession.Close()
+
+	// Comando para instalar a chave (cria .ssh se necessário, adiciona chave, ajusta permissões)
+	installCmd := fmt.Sprintf(
+		"mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo %q >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys",
+		pubKey,
+	)
+
+	if err := installSession.Run(installCmd); err != nil {
+		return fmt.Errorf("erro ao instalar chave pública: %w", err)
+	}
+
+	// Sucesso - informa o usuário
+	fmt.Fprintf(os.Stderr, "✅ Chave pública instalada com sucesso no servidor remoto\n")
+	return nil
 }
 
 // NewSSHConnection cria uma nova conexão SSH

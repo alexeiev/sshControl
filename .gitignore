@@ -1,5 +1,6 @@
 bin/
 docs_int/
+.vscode/
 *.md
 !README.md
 !CHANGELOG.md

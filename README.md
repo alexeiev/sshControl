@@ -16,6 +16,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🌐 **Proxy Reverso**: Compartilhe proxy HTTP/HTTPS/FTP da máquina local com hosts remotos
 - 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente
 - 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
+- 🔐 **SSH-COPY-ID**: Caso o usuário não tiver sua chave no servidor, será adicionada
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
 
 ## Instalação
