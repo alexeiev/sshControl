@@ -19,10 +19,11 @@ import (
 // 3. user@host: "ubuntu@192.168.1.50" (porta 22 por padrão)
 // 4. host:port: "192.168.1.50:22" (usa usuário especificado ou default)
 // 5. host: "192.168.1.50" (usa usuário especificado ou default e porta 22)
-func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
+func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
 	var hostname string
 	var port int
 	var sshKey string
+	var shouldAutoCreate bool // Flag para indicar se deve criar o host automaticamente
 
 	// Determina o usuário efetivo (flag -u tem precedência sobre default_user)
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
@@ -65,6 +66,11 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 
 		hostname = host.hostname
 		port = host.port
+
+		// Verifica se auto_create está habilitado e se o host não existe pelo endereço
+		if cfg.Config.AutoCreate && cfg.FindHostByAddress(hostname) == nil {
+			shouldAutoCreate = true
+		}
 	}
 
 	// Busca a chave SSH do jump host se estiver usando jump host
@@ -121,6 +127,40 @@ func Connect(cfg *config.ConfigFile, hostArg string, selectedUser *config.User, 
 		fmt.Fprintf(os.Stderr, "\n❌ Erro na conexão SSH: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Auto-criação do host após conexão bem-sucedida
+	if shouldAutoCreate {
+		autoCreateHost(cfg, configPath, hostArg, hostname, port)
+	}
+}
+
+// autoCreateHost adiciona um host não cadastrado ao arquivo de configuração
+func autoCreateHost(cfg *config.ConfigFile, configPath string, name string, hostname string, port int) {
+	newHost := config.Host{
+		Name: name,
+		Host: hostname,
+		Port: port,
+		Tags: []string{"autocreated"},
+	}
+
+	cfg.AddHost(newHost)
+
+	if err := cfg.SaveConfig(configPath); err != nil {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Aviso: Não foi possível salvar o host no config.yaml: %v\n", err)
+		return
+	}
+
+	fmt.Println()
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("✅ Host adicionado automaticamente ao config.yaml:\n")
+	fmt.Printf("   name: %s\n", name)
+	fmt.Printf("   host: %s\n", hostname)
+	fmt.Printf("   port: %d\n", port)
+	fmt.Printf("   tags: [autocreated]\n")
+	fmt.Println()
+	fmt.Println("📝 Finalize a configuração do host editando o arquivo:")
+	fmt.Printf("   %s\n", configPath)
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }
 
 // parsedHost representa um host parseado de uma string de conexão

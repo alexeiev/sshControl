@@ -15,11 +15,14 @@ import (
 
 // HostResult armazena o resultado da execução em um host
 type HostResult struct {
-	Host     string
-	Success  bool
-	Output   string
-	Error    string
-	ExitCode int
+	Host           string
+	Success        bool
+	Output         string
+	Error          string
+	ExitCode       int
+	ShouldAutoCreate bool   // Indica se o host deve ser auto-criado
+	Hostname       string // Hostname real para auto-criação
+	Port           int    // Porta para auto-criação
 }
 
 // expandTagsToHosts expande argumentos com @tag para lista de hosts
@@ -58,7 +61,7 @@ func expandTagsToHosts(cfg *config.ConfigFile, hostArgs []string) ([]string, []s
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
-func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
+func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
 	// Determina o usuário efetivo
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
 	if effectiveUser == nil {
@@ -149,6 +152,11 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 
 	// Exibe resultados organizados
 	displayResults(allResults, duration)
+
+	// Auto-criação de hosts após execução bem-sucedida
+	if cfg.Config.AutoCreate {
+		autoCreateHostsFromResults(cfg, configPath, allResults)
+	}
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
@@ -156,6 +164,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 	var hostname string
 	var port int
 	var sshKey string
+	var shouldAutoCreate bool
 
 	username := effectiveUser.Name
 	if len(effectiveUser.SSHKeys) > 0 {
@@ -192,6 +201,11 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 
 		hostname = host.hostname
 		port = host.port
+
+		// Verifica se auto_create está habilitado e se o host não existe pelo endereço
+		if cfg.Config.AutoCreate && cfg.FindHostByAddress(hostname) == nil {
+			shouldAutoCreate = true
+		}
 	}
 
 	// Busca a chave SSH do jump host se estiver usando jump host
@@ -242,11 +256,59 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 	}
 
 	return HostResult{
-		Host:     hostArg,
-		Success:  true,
-		Output:   output,
-		ExitCode: exitCode,
+		Host:             hostArg,
+		Success:          true,
+		Output:           output,
+		ExitCode:         exitCode,
+		ShouldAutoCreate: shouldAutoCreate,
+		Hostname:         hostname,
+		Port:             port,
 	}
+}
+
+// autoCreateHostsFromResults adiciona hosts não cadastrados ao arquivo de configuração
+func autoCreateHostsFromResults(cfg *config.ConfigFile, configPath string, results []HostResult) {
+	var hostsToCreate []HostResult
+
+	// Coleta hosts que devem ser auto-criados (apenas os bem-sucedidos)
+	for _, result := range results {
+		if result.Success && result.ShouldAutoCreate {
+			hostsToCreate = append(hostsToCreate, result)
+		}
+	}
+
+	if len(hostsToCreate) == 0 {
+		return
+	}
+
+	// Adiciona os hosts à configuração
+	for _, result := range hostsToCreate {
+		newHost := config.Host{
+			Name: result.Host,
+			Host: result.Hostname,
+			Port: result.Port,
+			Tags: []string{"autocreated"},
+		}
+		cfg.AddHost(newHost)
+	}
+
+	// Salva a configuração
+	if err := cfg.SaveConfig(configPath); err != nil {
+		fmt.Fprintf(os.Stderr, "\n⚠️  Aviso: Não foi possível salvar os hosts no config.yaml: %v\n", err)
+		return
+	}
+
+	// Exibe mensagem informativa
+	fmt.Println()
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("✅ %d host(s) adicionado(s) automaticamente ao config.yaml:\n", len(hostsToCreate))
+	for _, result := range hostsToCreate {
+		fmt.Printf("   - %s (%s:%d) [autocreated]\n", result.Host, result.Hostname, result.Port)
+	}
+	fmt.Println()
+	fmt.Println("📝 Finalize a configuração dos hosts editando o arquivo:")
+	fmt.Printf("   %s\n", configPath)
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }
 
 // displayResults exibe os resultados de forma organizada

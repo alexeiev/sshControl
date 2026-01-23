@@ -19,6 +19,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
 - 🔑 **Auto-Instalação de Chaves**: Instala automaticamente sua chave pública no servidor após primeira conexão
 - 🔒 **Controle de Senha**: Flag `-a` para solicitar senha antecipadamente (ideal para automações)
+- 📝 **Auto-Criação de Hosts**: Salva automaticamente hosts não cadastrados no config.yaml
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
 
 ## Instalação
@@ -71,6 +72,7 @@ Na primeira execução, o sshControl cria automaticamente o arquivo de configura
 ```yaml
 config:
   default_user: ubuntu
+  auto_create: false          # Se true, salva hosts não cadastrados automaticamente
   proxy: "192.168.0.1:3128"  # IP:PORT do proxy HTTP/HTTPS/FTP na máquina local
   proxy_port: 9999            # Porta local no host remoto para acessar o proxy
   users:
@@ -95,19 +97,27 @@ hosts:
   - name: webserver
     host: 192.168.1.50
     port: 22
-    tags: [web, production]
+    tags: 
+      - web
+      - production
   - name: database
     host: 192.168.1.51
     port: 22
-    tags: [db, production]
+    tags: 
+      - db
+      - production
   - name: app-server
     host: 10.0.1.100
     port: 22
-    tags: [app, production]
+    tags: 
+      - app
+      -  production
   - name: staging-web
     host: 10.0.2.50
     port: 22
-    tags: [web, staging]
+    tags: 
+      - web
+      - staging
 ```
 
 ## Uso
@@ -222,7 +232,10 @@ sc update
 # Ou com sudo se instalado em /usr/local/bin
 sudo sc update
 
-# Ajuda
+# Manual completo com exemplos detalhados
+sc man
+
+# Ajuda rápida
 sc --help
 ```
 
@@ -279,23 +292,37 @@ hosts:
   - name: web1
     host: 192.168.1.10
     port: 22
-    tags: [web, production, nginx]
+    tags: 
+      - web
+      - production
+      - nginx
   - name: web2
     host: 192.168.1.11
     port: 22
-    tags: [web, production, nginx]
+    tags: 
+      - web
+      - production
+      - nginx
   - name: db-master
     host: 192.168.1.20
     port: 22
-    tags: [db, production, mysql]
+    tags: 
+      - db
+      - production
+      - mysql
   - name: db-replica
     host: 192.168.1.21
     port: 22
-    tags: [db, production, mysql]
+    tags: 
+      - db
+      - production
+      - mysql
   - name: staging-web
     host: 10.0.1.10
     port: 22
-    tags: [web, staging]
+    tags: 
+      - web
+      - staging
 ```
 
 **Uso com Tags**:
@@ -347,6 +374,63 @@ db-master            192.168.1.20:22           db, production, mysql
 2. **Serviços**: Agrupe por tipo de serviço (`web`, `db`, `cache`, `queue`)
 3. **Aplicações**: Identifique a aplicação (`nginx`, `mysql`, `redis`)
 4. **Regiões**: Organize por localização (`us-east`, `eu-west`, `sa-east`)
+
+### Auto-Criação de Hosts
+
+O sshControl pode salvar automaticamente hosts não cadastrados no arquivo de configuração. Isso é útil para manter um registro de todos os servidores que você acessa.
+
+**Configuração**:
+
+```yaml
+config:
+  auto_create: true  # Habilita auto-criação de hosts
+```
+
+**Como Funciona**:
+
+1. Quando você conecta a um host não cadastrado (por IP ou hostname direto)
+2. Se `auto_create: true`, o host é salvo automaticamente após conexão bem-sucedida
+3. O host recebe a tag `autocreated` para identificação
+4. Uma mensagem é exibida solicitando que você finalize a configuração
+
+**Exemplo**:
+
+```bash
+# Conecta a um host não cadastrado
+sc 192.168.1.100
+
+# Após a sessão SSH, se auto_create estiver habilitado:
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ✅ Host adicionado automaticamente ao config.yaml:
+#    name: 192.168.1.100
+#    host: 192.168.1.100
+#    port: 22
+#    tags: [autocreated]
+#
+# 📝 Finalize a configuração do host editando o arquivo:
+#    ~/.sshControl/config.yaml
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Comportamento da Tag `autocreated`**:
+
+- Hosts com esta tag **NÃO aparecem** no menu interativo (TUI)
+- Hosts **aparecem normalmente** na listagem `sc -s`
+- Você pode executar comandos usando `@autocreated`:
+  ```bash
+  sc -c "uptime" -l @autocreated
+  ```
+- Após configurar o host (adicionar nome amigável, outras tags), remova a tag `autocreated`
+
+**Múltiplos Hosts**:
+
+A auto-criação também funciona em modo múltiplos hosts:
+
+```bash
+sc -c "hostname" -l 192.168.1.10 192.168.1.11 192.168.1.12
+
+# Após execução bem-sucedida, todos os hosts novos são salvos
+```
 
 ### Jump Hosts
 
