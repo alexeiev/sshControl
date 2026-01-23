@@ -56,7 +56,12 @@ type hostItem struct {
 }
 
 func (i hostItem) FilterValue() string {
-	return i.host.Name + " " + i.host.Host
+	filterValue := i.host.Name + " " + i.host.Host
+	// Adiciona tags ao valor de filtro para permitir busca por tag
+	if len(i.host.Tags) > 0 {
+		filterValue += " " + strings.Join(i.host.Tags, " ")
+	}
+	return filterValue
 }
 
 func (i hostItem) Title() string {
@@ -64,7 +69,11 @@ func (i hostItem) Title() string {
 }
 
 func (i hostItem) Description() string {
-	return i.host.Host
+	desc := i.host.Host
+	if len(i.host.Tags) > 0 {
+		desc += " [" + strings.Join(i.host.Tags, ", ") + "]"
+	}
+	return desc
 }
 
 // model representa o estado da aplicação

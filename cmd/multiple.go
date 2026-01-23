@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,41 @@ type HostResult struct {
 	ExitCode int
 }
 
+// expandTagsToHosts expande argumentos com @tag para lista de hosts
+// Retorna a lista expandida de hosts e as tags encontradas
+func expandTagsToHosts(cfg *config.ConfigFile, hostArgs []string) ([]string, []string) {
+	var expandedHosts []string
+	var tagsFound []string
+	hostSet := make(map[string]bool) // Para evitar duplicatas
+
+	for _, arg := range hostArgs {
+		if strings.HasPrefix(arg, "@") {
+			// É uma tag - expande para todos os hosts com essa tag
+			tag := strings.TrimPrefix(arg, "@")
+			tagsFound = append(tagsFound, tag)
+			hosts := cfg.FindHostsByTag(tag)
+			if len(hosts) == 0 {
+				fmt.Fprintf(os.Stderr, "⚠️  Aviso: Nenhum host encontrado com a tag '%s'\n", tag)
+				continue
+			}
+			for _, host := range hosts {
+				if !hostSet[host.Name] {
+					hostSet[host.Name] = true
+					expandedHosts = append(expandedHosts, host.Name)
+				}
+			}
+		} else {
+			// É um host normal
+			if !hostSet[arg] {
+				hostSet[arg] = true
+				expandedHosts = append(expandedHosts, arg)
+			}
+		}
+	}
+
+	return expandedHosts, tagsFound
+}
+
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
 func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
 	// Determina o usuário efetivo
@@ -29,6 +65,14 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 		fmt.Fprintf(os.Stderr, "Erro: Nenhum usuário configurado\n")
 		os.Exit(1)
 	}
+
+	// Expande tags para hosts
+	expandedHosts, tagsFound := expandTagsToHosts(cfg, hostArgs)
+	if len(expandedHosts) == 0 {
+		fmt.Fprintf(os.Stderr, "Erro: Nenhum host válido especificado\n")
+		os.Exit(1)
+	}
+	hostArgs = expandedHosts
 
 	// Obtém configuração de proxy uma vez
 	proxyAddress, proxyPort, proxyConfigured := cfg.Config.GetProxyConfig()
@@ -39,6 +83,9 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 	}
 
 	fmt.Println()
+	if len(tagsFound) > 0 {
+		fmt.Printf("🏷️  Tags: %s\n", strings.Join(tagsFound, ", "))
+	}
 	fmt.Printf("🚀 Executando comando em %d host(s): %s\n", len(hostArgs), command)
 	if jumpHost != nil {
 		fmt.Printf("   via Jump Host: %s (%s@%s:%d)\n", jumpHost.Name, jumpHost.User, jumpHost.Host, jumpHost.Port)

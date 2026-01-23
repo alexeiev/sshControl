@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/alexeiev/sshControl/config"
 	"golang.org/x/term"
@@ -230,12 +231,16 @@ func ListServers(cfg *config.ConfigFile) {
 
 	fmt.Println("📋 Servidores cadastrados:")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("%-20s %s\n", "Nome", "Host:Porta")
+	fmt.Printf("%-20s %-25s %s\n", "Nome", "Host:Porta", "Tags")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	for _, host := range cfg.Hosts {
 		hostPort := fmt.Sprintf("%s:%d", host.Host, host.Port)
-		fmt.Printf("%-20s %s\n", host.Name, hostPort)
+		tags := "-"
+		if len(host.Tags) > 0 {
+			tags = strings.Join(host.Tags, ", ")
+		}
+		fmt.Printf("%-20s %-25s %s\n", host.Name, hostPort, tags)
 	}
 
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

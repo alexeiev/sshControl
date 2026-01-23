@@ -33,9 +33,10 @@ type Config struct {
 
 // Host representa um host SSH
 type Host struct {
-	Name string `yaml:"name"`
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Name string   `yaml:"name"`
+	Host string   `yaml:"host"`
+	Port int      `yaml:"port"`
+	Tags []string `yaml:"tags"`
 }
 
 // ConfigFile representa a estrutura completa do arquivo YAML
@@ -135,6 +136,37 @@ func (c *ConfigFile) FindHost(name string) *Host {
 		}
 	}
 	return nil
+}
+
+// FindHostsByTag retorna todos os hosts que possuem a tag especificada
+func (c *ConfigFile) FindHostsByTag(tag string) []Host {
+	var hosts []Host
+	tagLower := strings.ToLower(tag)
+	for _, host := range c.Hosts {
+		for _, t := range host.Tags {
+			if strings.ToLower(t) == tagLower {
+				hosts = append(hosts, host)
+				break
+			}
+		}
+	}
+	return hosts
+}
+
+// GetAllTags retorna todas as tags únicas cadastradas nos hosts
+func (c *ConfigFile) GetAllTags() []string {
+	tagSet := make(map[string]bool)
+	for _, host := range c.Hosts {
+		for _, tag := range host.Tags {
+			tagSet[tag] = true
+		}
+	}
+
+	var tags []string
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	return tags
 }
 
 // FindJumpHost procura um jump host pelo nome

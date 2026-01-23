@@ -66,7 +66,12 @@ e gerenciamento de múltiplos hosts em paralelo.`,
   sc -j 1 -c "df -h" -l db1 db2 db3
   sc -a -c "hostname" -l web1 web2 web3  # Solicita senha antes
 
-  # Listar jump hosts e servidores cadastrados
+  # Executar comando usando tags (prefixo @)
+  sc -c "uptime" -l @web              # Todos os hosts com tag "web"
+  sc -c "df -h" -l @infra @database   # Tags "infra" e "database"
+  sc -c "hostname" -l @web server1    # Combina tag e host específico
+
+  # Listar jump hosts e servidores cadastrados (inclui tags)
   sc -s`,
 	Args: cobra.ArbitraryArgs,
 	Run:  runCommand,
