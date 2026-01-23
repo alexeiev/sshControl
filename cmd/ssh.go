@@ -16,17 +16,18 @@ import (
 
 // SSHConnection representa os parâmetros de uma conexão SSH
 type SSHConnection struct {
-	User           string
-	Host           string
-	Port           int
-	SSHKey         string
-	Password       string // Senha pré-fornecida (opcional)
-	JumpHost       *config.JumpHost
-	JumpHostSSHKey string
-	Command        string
-	ProxyEnabled   bool
-	ProxyAddress   string
-	ProxyPort      int
+	User                      string
+	Host                      string
+	Port                      int
+	SSHKey                    string
+	Password                  string // Senha pré-fornecida (opcional)
+	JumpHost                  *config.JumpHost
+	JumpHostSSHKey            string
+	Command                   string
+	ProxyEnabled              bool
+	ProxyAddress              string
+	ProxyPort                 int
+	InteractivePasswordAllowed bool // Se false, não pede senha interativamente (para modo múltiplos hosts)
 }
 
 // Connect estabelece uma conexão SSH interativa
@@ -161,8 +162,9 @@ func (s *SSHConnection) createAuthMethods(sshKeyPath string, context string) []s
 	if s.Password != "" {
 		// Se a senha foi pré-fornecida, usa ela diretamente
 		authMethods = append(authMethods, ssh.Password(s.Password))
-	} else {
-		// Caso contrário, pede senha interativamente como fallback
+	} else if s.InteractivePasswordAllowed {
+		// Só pede senha interativamente se permitido (modo single host)
+		// Em modo múltiplos hosts, isso é desabilitado para evitar múltiplos prompts
 		authMethods = append(authMethods, ssh.PasswordCallback(func() (string, error) {
 			fmt.Printf("Password for %s: ", context)
 			password, err := term.ReadPassword(int(os.Stdin.Fd()))
@@ -482,16 +484,17 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 // NewSSHConnection cria uma nova conexão SSH
 func NewSSHConnection(user, host string, port int, sshKey, password string, jumpHost *config.JumpHost, jumpHostSSHKey string, command string, proxyEnabled bool, proxyAddress string, proxyPort int) *SSHConnection {
 	return &SSHConnection{
-		User:           user,
-		Host:           host,
-		Port:           port,
-		SSHKey:         sshKey,
-		Password:       password,
-		JumpHost:       jumpHost,
-		JumpHostSSHKey: jumpHostSSHKey,
-		Command:        command,
-		ProxyEnabled:   proxyEnabled,
-		ProxyAddress:   proxyAddress,
-		ProxyPort:      proxyPort,
+		User:                       user,
+		Host:                       host,
+		Port:                       port,
+		SSHKey:                     sshKey,
+		Password:                   password,
+		JumpHost:                   jumpHost,
+		JumpHostSSHKey:             jumpHostSSHKey,
+		Command:                    command,
+		ProxyEnabled:               proxyEnabled,
+		ProxyAddress:               proxyAddress,
+		ProxyPort:                  proxyPort,
+		InteractivePasswordAllowed: true, // Por padrão, permite senha interativa (modo single host)
 	}
 }

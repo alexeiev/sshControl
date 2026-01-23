@@ -22,7 +22,7 @@ type HostResult struct {
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
-func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool) {
+func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
 	// Determina o usuário efetivo
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
 	if effectiveUser == nil {
@@ -45,10 +45,19 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 	}
 	fmt.Println()
 
-	// Se o usuário não tem chave SSH, pede a senha uma vez antes de iniciar as conexões paralelas
+	// Em modo múltiplos hosts, solicita senha apenas se -a for especificado
+	// Isso evita interrupção em automações/loops
 	password := ""
-	if len(effectiveUser.SSHKeys) == 0 {
-		fmt.Printf("Password for %s (será usada para todos os hosts): ", effectiveUser.Name)
+	if askPassword {
+		// Flag -a foi especificada, solicita senha antecipadamente
+		if len(effectiveUser.SSHKeys) == 0 {
+			// Usuário sem chave configurada - senha é obrigatória
+			fmt.Printf("Password for %s (será usada para todos os hosts): ", effectiveUser.Name)
+		} else {
+			// Usuário com chave configurada - senha como fallback
+			fmt.Printf("Password for %s (fallback caso chave SSH falhe, Enter para pular): ", effectiveUser.Name)
+		}
+
 		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 		fmt.Println()
 		if err != nil {
@@ -71,7 +80,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 		wg.Add(1)
 		go func(hostArg string) {
 			defer wg.Done()
-			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command, proxyActive, proxyAddress, proxyPort)
+			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command, proxyActive, proxyAddress, proxyPort, askPassword)
 			results <- result
 		}(hostArg)
 	}
@@ -96,7 +105,7 @@ func ConnectMultiple(cfg *config.ConfigFile, hostArgs []string, selectedUser *co
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
-func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int) HostResult {
+func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, askPassword bool) HostResult {
 	var hostname string
 	var port int
 	var sshKey string
@@ -159,14 +168,28 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		proxyPort,
 	)
 
+	// Em modo múltiplos hosts, desabilita prompt interativo de senha
+	// A senha já foi solicitada uma vez antes das conexões paralelas
+	sshConn.InteractivePasswordAllowed = false
+
 	// Executa o comando e captura a saída
 	output, exitCode, err := sshConn.ExecuteCommandWithOutput()
 	if err != nil {
+		errorMsg := err.Error()
+
+		// Se falhou por autenticação e não foi pedida senha (-a), sugere usar a flag
+		if !askPassword && password == "" && sshKey == "" {
+			errorMsg += " (DICA: Use a opção -a ou --ask-password para fornecer senha)"
+		} else if !askPassword && password == "" && sshKey != "" {
+			// Tem chave configurada mas pode não estar instalada
+			errorMsg += " (DICA: Se a chave SSH não estiver instalada, use -a para fornecer senha)"
+		}
+
 		return HostResult{
 			Host:     hostArg,
 			Success:  false,
 			Output:   output,
-			Error:    err.Error(),
+			Error:    errorMsg,
 			ExitCode: exitCode,
 		}
 	}

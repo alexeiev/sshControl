@@ -16,7 +16,8 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🌐 **Proxy Reverso**: Compartilhe proxy HTTP/HTTPS/FTP da máquina local com hosts remotos
 - 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente
 - 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
-- 🔐 **SSH-COPY-ID**: Caso o usuário não tiver sua chave no servidor, será adicionada
+- 🔑 **Auto-Instalação de Chaves**: Instala automaticamente sua chave pública no servidor após primeira conexão
+- 🔒 **Controle de Senha**: Flag `-a` para solicitar senha antecipadamente (ideal para automações)
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
 
 ## Instalação
@@ -168,6 +169,20 @@ sc -c "free -h" -l webserver 192.168.1.50 ubuntu@192.168.1.51
 
 # Via jump host
 sc -j 1 -c "df -h" -l db1 db2 db3
+
+# Solicitando senha antecipadamente (útil para automações)
+sc -a -c "hostname" -l web1 web2 web3
+```
+
+**Controle de Autenticação**:
+```bash
+# Sem -a: tenta chave SSH, falha silenciosamente (ideal para automações/loops)
+for host in web1 web2 web3; do
+    sc -c "uptime" $host
+done
+
+# Com -a: solicita senha uma vez antes de executar (quando chaves não estão instaladas)
+sc -a -c "uptime" -l web1 web2 web3
 ```
 
 ### Comandos Úteis
@@ -189,6 +204,46 @@ sc --help
 ```
 
 ## Características Detalhadas
+
+### Auto-Instalação de Chaves SSH
+
+O sshControl automatiza a instalação de chaves públicas SSH nos servidores remotos, eliminando a necessidade de usar `ssh-copy-id` manualmente.
+
+**Como Funciona**:
+
+1. **Validação**: Na inicialização, verifica se os arquivos `.pub` existem para cada chave privada configurada
+2. **Primeira Conexão**: Ao conectar com senha (quando chave ainda não está instalada), automaticamente:
+   - Lê o arquivo `.pub` correspondente à chave privada
+   - Verifica se a chave já existe no `~/.ssh/authorized_keys` do servidor
+   - Se não existir, adiciona a chave com permissões corretas
+3. **Próximas Conexões**: Autentica automaticamente via chave SSH (sem senha)
+
+**Exemplo Prático**:
+
+```bash
+# Primeira vez conectando ao servidor (sem chave instalada)
+sc -a webserver
+# Password for ubuntu@webserver: ********
+# ✅ Chave pública instalada com sucesso no servidor remoto
+
+# Próximas conexões já usam a chave (sem senha)
+sc webserver
+# 🔗 Conectando...
+#    ubuntu@192.168.1.50 (key: ~/.ssh/id_rsa)
+```
+
+**Avisos**:
+
+Se o arquivo `.pub` não existir, você verá um aviso:
+```
+⚠️  Aviso: Chave pública não encontrada para usuário 'ubuntu': ~/.ssh/id_rsa.pub (auto-instalação desabilitada)
+```
+
+**Importante**:
+- Funciona em **modo interativo**, **modo direto** e **múltiplos hosts**
+- Requer autenticação bem-sucedida primeiro (senha, agent, etc.)
+- Não sobrescreve chaves existentes, apenas adiciona
+- Define permissões corretas automaticamente (700 para `.ssh`, 600 para `authorized_keys`)
 
 ### Jump Hosts
 
@@ -266,7 +321,43 @@ curl -I http://google.com
 Ordem de tentativa de autenticação:
 1. Chave SSH (especificada no config)
 2. SSH Agent (se disponível)
-3. Senha (solicitada interativamente)
+3. Senha (solicitada interativamente ou com `-a`)
+
+**Controle de Senha com Flag `-a`**:
+
+A flag `-a` ou `--ask-password` permite controlar quando a senha é solicitada:
+
+```bash
+# Sem -a: senha solicitada interativamente como fallback (modo single host)
+sc webserver
+
+# Sem -a: em múltiplos hosts, tenta apenas chave SSH (ideal para automações)
+sc -c "uptime" -l web1 web2 web3
+
+# Com -a: solicita senha ANTES de tentar conectar
+sc -a webserver
+sc -a -c "uptime" -l web1 web2 web3
+```
+
+**Casos de Uso**:
+
+1. **Automações/Scripts**: Use SEM `-a` para não interromper loops
+   ```bash
+   for host in web{1..10}; do
+       sc -c "uptime" $host  # Falha silenciosamente se chave não funcionar
+   done
+   ```
+
+2. **Primeira Conexão**: Use COM `-a` quando chaves ainda não estão instaladas
+   ```bash
+   # Solicita senha uma vez, instala chave, próximas conexões sem senha
+   sc -a -c "hostname" -l server1 server2 server3
+   ```
+
+3. **Servidores Sem Chave**: Use COM `-a` quando precisa usar senha
+   ```bash
+   sc -a production-db
+   ```
 
 ### Execução Paralela
 
