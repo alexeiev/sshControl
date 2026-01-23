@@ -25,6 +25,7 @@ var (
 	showServers   bool
 	showVersion   bool
 	proxyEnabled  bool
+	askPassword   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -63,6 +64,7 @@ e gerenciamento de múltiplos hosts em paralelo.`,
   sc -c "uptime" -l web1 web2 web3
   sc -c "free -h" -l 192.168.1.10 192.168.1.11
   sc -j 1 -c "df -h" -l db1 db2 db3
+  sc -a -c "hostname" -l web1 web2 web3  # Solicita senha antes
 
   # Listar jump hosts e servidores cadastrados
   sc -s`,
@@ -89,6 +91,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista jump hosts e servidores cadastrados no config")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Exibe a versão do sshControl")
 	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
+	rootCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação (útil para automações)")
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
@@ -179,14 +182,14 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
 			os.Exit(1)
 		}
-		cmd.ConnectMultiple(cfg, args, selectedUser, selectedJumpHost, command, proxyEnabled)
+		cmd.ConnectMultiple(cfg, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
 		return
 	}
 
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled)
+		cmd.Connect(cfg, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
 		return
 	}
 

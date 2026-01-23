@@ -7,9 +7,26 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.2.1.1] - 2026-01-22
+
 ### Added
 
-- Adicionado a funcionalidade de copiar a chave pública para o servidor que ainda não tem.  
+- Auto-instalação de chaves SSH públicas nos servidores remotos após primeira conexão bem-sucedida
+- Validação de existência de arquivos `.pub` para chaves privadas configuradas com avisos informativos
+- Flag `-a, --ask-password` para solicitar senha antecipadamente (útil para automações e scripts)
+- Mensagens de erro melhoradas sugerindo uso de `-a` quando autenticação falha
+
+### Changed
+
+- Modo múltiplos hosts agora NÃO solicita senha automaticamente (evita interrupção em loops/automações)
+- Senha em múltiplos hosts só é solicitada se flag `-a` for especificada
+- Campo `InteractivePasswordAllowed` adicionado à struct `SSHConnection` para controle de prompt interativo
+
+### Fixed
+
+- Corrigido problema de múltiplas solicitações de senha simultâneas em modo múltiplos hosts
+- Corrigido prompts de senha sobrepostos quando executando comandos em paralelo sem chave SSH instalada
+- Mensagens de erro agora são mais claras, indicando quando usar `-a` para fornecer senha
 
 ## [0.2.1] - 2026-01-22
 
@@ -79,7 +96,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.2.1.1...HEAD
+[0.2.1.1]: https://github.com/alexeiev/sshControl/compare/v0.2.1...v0.2.1.1
+[0.2.1]: https://github.com/alexeiev/sshControl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/alexeiev/sshControl/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/alexeiev/sshControl/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/alexeiev/sshControl/compare/v0.1.2...v0.1.3
