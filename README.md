@@ -13,6 +13,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🚀 **Modo Interativo (TUI)**: Menu visual para seleção de hosts
 - ⚡ **Modo Direto**: Conecte rapidamente via linha de comando
 - 🔗 **Jump Hosts**: Suporte completo para conexões via bastion/jump hosts
+- 🏷️ **Tags para Hosts**: Agrupe hosts por tags e execute comandos em lote por grupo
 - 🌐 **Proxy Reverso**: Compartilhe proxy HTTP/HTTPS/FTP da máquina local com hosts remotos
 - 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente
 - 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
@@ -94,12 +95,19 @@ hosts:
   - name: webserver
     host: 192.168.1.50
     port: 22
+    tags: [web, production]
   - name: database
     host: 192.168.1.51
     port: 22
+    tags: [db, production]
   - name: app-server
     host: 10.0.1.100
     port: 22
+    tags: [app, production]
+  - name: staging-web
+    host: 10.0.2.50
+    port: 22
+    tags: [web, staging]
 ```
 
 ## Uso
@@ -174,6 +182,21 @@ sc -j 1 -c "df -h" -l db1 db2 db3
 sc -a -c "hostname" -l web1 web2 web3
 ```
 
+**Usando Tags** (prefixo `@`):
+```bash
+# Executar em todos os hosts com tag "web"
+sc -c "uptime" -l @web
+
+# Executar em múltiplas tags
+sc -c "df -h" -l @web @db
+
+# Combinar tags com hosts específicos
+sc -c "hostname" -l @production server1 192.168.1.100
+
+# Com jump host
+sc -j 1 -c "systemctl status nginx" -l @web
+```
+
 **Controle de Autenticação**:
 ```bash
 # Sem -a: tenta chave SSH, falha silenciosamente (ideal para automações/loops)
@@ -244,6 +267,86 @@ Se o arquivo `.pub` não existir, você verá um aviso:
 - Requer autenticação bem-sucedida primeiro (senha, agent, etc.)
 - Não sobrescreve chaves existentes, apenas adiciona
 - Define permissões corretas automaticamente (700 para `.ssh`, 600 para `authorized_keys`)
+
+### Tags para Hosts
+
+Organize seus hosts em grupos usando tags para facilitar a execução de comandos em lote.
+
+**Configuração**:
+
+```yaml
+hosts:
+  - name: web1
+    host: 192.168.1.10
+    port: 22
+    tags: [web, production, nginx]
+  - name: web2
+    host: 192.168.1.11
+    port: 22
+    tags: [web, production, nginx]
+  - name: db-master
+    host: 192.168.1.20
+    port: 22
+    tags: [db, production, mysql]
+  - name: db-replica
+    host: 192.168.1.21
+    port: 22
+    tags: [db, production, mysql]
+  - name: staging-web
+    host: 10.0.1.10
+    port: 22
+    tags: [web, staging]
+```
+
+**Uso com Tags**:
+
+```bash
+# Executar em todos os hosts com tag "web"
+sc -c "nginx -t" -l @web
+
+# Executar em múltiplas tags (união de hosts)
+sc -c "df -h" -l @web @db
+
+# Combinar tags com hosts específicos
+sc -c "uptime" -l @production monitoring-server
+
+# Apenas hosts de produção
+sc -c "systemctl status nginx" -l @production
+
+# Reiniciar MySQL em todos os servidores de banco
+sc -c "systemctl restart mysql" -l @mysql
+```
+
+**Filtro na TUI**:
+
+No modo interativo, pressione `/` e digite o nome de uma tag para filtrar os hosts:
+
+```
+Filtrar hosts...> production
+```
+
+Mostrará apenas hosts que possuem a tag "production".
+
+**Listagem de Tags**:
+
+O comando `sc -s` exibe as tags de cada host:
+
+```
+📋 Servidores cadastrados:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Nome                 Host:Porta                Tags
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+web1                 192.168.1.10:22           web, production, nginx
+web2                 192.168.1.11:22           web, production, nginx
+db-master            192.168.1.20:22           db, production, mysql
+```
+
+**Casos de Uso**:
+
+1. **Ambientes**: Separe hosts por ambiente (`production`, `staging`, `development`)
+2. **Serviços**: Agrupe por tipo de serviço (`web`, `db`, `cache`, `queue`)
+3. **Aplicações**: Identifique a aplicação (`nginx`, `mysql`, `redis`)
+4. **Regiões**: Organize por localização (`us-east`, `eu-west`, `sa-east`)
 
 ### Jump Hosts
 
