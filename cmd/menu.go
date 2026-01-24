@@ -56,7 +56,12 @@ type hostItem struct {
 }
 
 func (i hostItem) FilterValue() string {
-	return i.host.Name + " " + i.host.Host
+	filterValue := i.host.Name + " " + i.host.Host
+	// Adiciona tags ao valor de filtro para permitir busca por tag
+	if len(i.host.Tags) > 0 {
+		filterValue += " " + strings.Join(i.host.Tags, " ")
+	}
+	return filterValue
 }
 
 func (i hostItem) Title() string {
@@ -64,7 +69,11 @@ func (i hostItem) Title() string {
 }
 
 func (i hostItem) Description() string {
-	return i.host.Host
+	desc := i.host.Host
+	if len(i.host.Tags) > 0 {
+		desc += " [" + strings.Join(i.host.Tags, ", ") + "]"
+	}
+	return desc
 }
 
 // model representa o estado da aplicação
@@ -86,13 +95,16 @@ type model struct {
 
 // ShowInteractive exibe o menu interativo usando bubbletea
 func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost, version string, proxyEnabled bool) {
-	if len(cfg.Hosts) == 0 {
+	// Filtra hosts para TUI (exclui hosts com tag "autocreated")
+	tuiHosts := cfg.GetHostsForTUI()
+
+	if len(tuiHosts) == 0 {
 		fmt.Println("Nenhum host configurado no arquivo config.yaml")
 		return
 	}
 
 	// Cria os items da lista
-	items := make([]list.Item, len(cfg.Hosts))
+	items := make([]list.Item, len(tuiHosts))
 
 	// Determina o usuário efetivo para esta sessão
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
@@ -107,7 +119,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
 	}
 
-	for i, h := range cfg.Hosts {
+	for i, h := range tuiHosts {
 		items[i] = hostItem{
 			host:          h,
 			sshKey:        sshKey,

@@ -5,7 +5,32 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+
+## [0.3.0] - 2026-01-23
+
+### Added
+
+- Sistema de **Tags para Hosts**: Agrupe hosts por tags para organização e execução em lote
+- Campo `tags: []` no cadastro de hosts no `config.yaml`
+- Sintaxe `@tagname` para executar comandos em todos os hosts de uma tag
+- Suporte a múltiplas tags na mesma execução (`sc -c "cmd" -l @web @database`)
+- Combinação de tags com hosts específicos (`sc -c "cmd" -l @web server1`)
+- Filtro por tags na TUI (digite `/` e busque pelo nome da tag)
+- Exibição de tags na listagem de servidores (`sc -s`)
+- Funções `FindHostsByTag()` e `GetAllTags()` no pacote config
+- **Auto-criação de Hosts**: Opção `config.auto_create` para salvar automaticamente hosts não cadastrados
+- Comando `sc man` com manual completo e exemplos de uso detalhados
+- Hosts criados automaticamente recebem a tag `autocreated`
+- Hosts com tag `autocreated` não aparecem na TUI mas podem ser usados via CLI e `@autocreated`
+- Mensagem informativa após conexão/execução bem-sucedida solicitando finalização da configuração
+
+### Changed
+
+- Formato de saída do comando `sc -s` agora inclui coluna de Tags
+- TUI exibe tags dos hosts na descrição (entre colchetes)
+- TUI filtra automaticamente hosts com tag `autocreated`
+- Template de configuração padrão inclui exemplos de tags e opção `auto_create`
+- Help (`sc --help`) simplificado com exemplos básicos e referência ao `sc man`
 
 ## [0.2.1.1] - 2026-01-22
 
@@ -96,7 +121,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.2.1.1...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alexeiev/sshControl/compare/v0.2.1.1...v0.3.0
 [0.2.1.1]: https://github.com/alexeiev/sshControl/compare/v0.2.1...v0.2.1.1
 [0.2.1]: https://github.com/alexeiev/sshControl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/alexeiev/sshControl/compare/v0.1.4...v0.2.0

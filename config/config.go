@@ -25,6 +25,7 @@ type JumpHost struct {
 // Config representa a seção de configuração global
 type Config struct {
 	DefaultUser string     `yaml:"default_user"`
+	AutoCreate  bool       `yaml:"auto_create"` // Se true, salva hosts não cadastrados automaticamente
 	User        []User     `yaml:"users"`
 	JumpHosts   []JumpHost `yaml:"jump_hosts"`
 	Proxy       string     `yaml:"proxy"`      // IP:PORT do proxy (ex: 10.0.230.100:8080)
@@ -33,9 +34,10 @@ type Config struct {
 
 // Host representa um host SSH
 type Host struct {
-	Name string `yaml:"name"`
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Name string   `yaml:"name"`
+	Host string   `yaml:"host"`
+	Port int      `yaml:"port"`
+	Tags []string `yaml:"tags"`
 }
 
 // ConfigFile representa a estrutura completa do arquivo YAML
@@ -135,6 +137,97 @@ func (c *ConfigFile) FindHost(name string) *Host {
 		}
 	}
 	return nil
+}
+
+// FindHostByAddress procura um host pelo endereço (campo host)
+func (c *ConfigFile) FindHostByAddress(address string) *Host {
+	for i := range c.Hosts {
+		if c.Hosts[i].Host == address {
+			return &c.Hosts[i]
+		}
+	}
+	return nil
+}
+
+// HasTag verifica se um host possui uma tag específica
+func (h *Host) HasTag(tag string) bool {
+	tagLower := strings.ToLower(tag)
+	for _, t := range h.Tags {
+		if strings.ToLower(t) == tagLower {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAutoCreated verifica se o host foi criado automaticamente
+func (h *Host) IsAutoCreated() bool {
+	return h.HasTag("autocreated")
+}
+
+// AddHost adiciona um novo host à configuração (em memória)
+func (c *ConfigFile) AddHost(host Host) {
+	c.Hosts = append(c.Hosts, host)
+}
+
+// SaveConfig salva a configuração atual no arquivo YAML
+func (c *ConfigFile) SaveConfig(filename string) error {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("erro ao serializar configuração: %w", err)
+	}
+
+	// Adiciona o marcador YAML no início
+	content := "---\n" + string(data) + "...\n"
+
+	if err := os.WriteFile(filename, []byte(content), 0644); err != nil {
+		return fmt.Errorf("erro ao salvar arquivo: %w", err)
+	}
+
+	return nil
+}
+
+// FindHostsByTag retorna todos os hosts que possuem a tag especificada
+func (c *ConfigFile) FindHostsByTag(tag string) []Host {
+	var hosts []Host
+	tagLower := strings.ToLower(tag)
+	for _, host := range c.Hosts {
+		for _, t := range host.Tags {
+			if strings.ToLower(t) == tagLower {
+				hosts = append(hosts, host)
+				break
+			}
+		}
+	}
+	return hosts
+}
+
+// GetAllTags retorna todas as tags únicas cadastradas nos hosts
+func (c *ConfigFile) GetAllTags() []string {
+	tagSet := make(map[string]bool)
+	for _, host := range c.Hosts {
+		for _, tag := range host.Tags {
+			tagSet[tag] = true
+		}
+	}
+
+	var tags []string
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+// GetHostsForTUI retorna hosts filtrados para exibição na TUI
+// Exclui hosts com a tag "autocreated"
+func (c *ConfigFile) GetHostsForTUI() []Host {
+	var hosts []Host
+	for _, host := range c.Hosts {
+		if !host.IsAutoCreated() {
+			hosts = append(hosts, host)
+		}
+	}
+	return hosts
 }
 
 // FindJumpHost procura um jump host pelo nome

@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/alexeiev/sshControl/cmd"
@@ -34,40 +36,16 @@ var rootCmd = &cobra.Command{
 	Long: `sshControl (sc) é um gerenciador de conexões SSH que oferece modos
 interativo (TUI) e CLI direto para gerenciar conexões SSH.
 
-Suporta conexões através de jump hosts, execução de comandos remotos
-e gerenciamento de múltiplos hosts em paralelo.`,
-	Example: `  # Modo interativo (menu TUI)
-  sc
-  sc -u ubuntu
+Suporta conexões através de jump hosts, execução de comandos remotos,
+gerenciamento de múltiplos hosts em paralelo e organização por tags.
 
-  # Conexão direta
-  sc webserver
-  sc 192.168.1.50
-  sc ubuntu@192.168.1.50:2222
-
-  # Usando jump host (por nome ou índice)
-  sc -j production-jump webserver
-  sc -j 1 webserver
-  sc -j staging-jump 192.168.1.50
-
-  # Com proxy reverso (compartilha proxy local com host remoto)
-  sc -p webserver
-  sc -j production-jump -p app-server
-  sc -p  # Modo interativo com proxy
-
-  # Executar comando remoto em host único
-  sc -c "uptime" webserver
-  sc -u deploy -c "systemctl status nginx" webserver
-  sc -j production-jump -c "cat /var/log/app.log" production-app
-
-  # Executar comando em múltiplos hosts
-  sc -c "uptime" -l web1 web2 web3
-  sc -c "free -h" -l 192.168.1.10 192.168.1.11
-  sc -j 1 -c "df -h" -l db1 db2 db3
-  sc -a -c "hostname" -l web1 web2 web3  # Solicita senha antes
-
-  # Listar jump hosts e servidores cadastrados
-  sc -s`,
+Para ver exemplos de uso e manual completo, execute: sc man`,
+	Example: `  sc                           # Abre menu interativo (TUI)
+  sc <host>                    # Conecta diretamente ao host
+  sc -c "comando" <host>       # Executa comando remoto
+  sc -c "comando" -l <hosts>   # Executa em múltiplos hosts
+  sc -s                        # Lista servidores cadastrados
+  sc man                       # Exibe manual completo com exemplos`,
 	Args: cobra.ArbitraryArgs,
 	Run:  runCommand,
 }
@@ -82,8 +60,189 @@ atualiza automaticamente o binário para a versão mais recente.`,
 	Run: runUpdate,
 }
 
+var manCmd = &cobra.Command{
+	Use:   "man",
+	Short: "Exibe o manual completo do sshControl",
+	Long:  "Exibe o manual completo com exemplos de uso detalhados.",
+	Run:   runMan,
+}
+
+// showWithPager exibe o conteúdo usando um paginador (less, more) ou saída direta
+func showWithPager(content string) {
+	// Tenta usar less primeiro (melhor experiência)
+	if pagerPath, err := exec.LookPath("less"); err == nil {
+		pagerCmd := exec.Command(pagerPath, "-R") // -R para suportar cores/formatação
+		pagerCmd.Stdin = strings.NewReader(content)
+		pagerCmd.Stdout = os.Stdout
+		pagerCmd.Stderr = os.Stderr
+		if err := pagerCmd.Run(); err == nil {
+			return
+		}
+	}
+
+	// Fallback para more
+	if pagerPath, err := exec.LookPath("more"); err == nil {
+		pagerCmd := exec.Command(pagerPath)
+		pagerCmd.Stdin = strings.NewReader(content)
+		pagerCmd.Stdout = os.Stdout
+		pagerCmd.Stderr = os.Stderr
+		if err := pagerCmd.Run(); err == nil {
+			return
+		}
+	}
+
+	// Fallback final: saída direta
+	fmt.Print(content)
+}
+
+func runMan(cobraCmd *cobra.Command, args []string) {
+	manual := `
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        sshControl (sc) - Manual de Uso                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+DESCRIÇÃO
+  sshControl (sc) é um gerenciador de conexões SSH que oferece modo interativo
+  (TUI) e CLI direto para gerenciar conexões SSH de forma eficiente.
+
+AUTOR
+  Alexeiev Araújo
+  @alexeiev
+
+CONFIGURAÇÃO
+  O arquivo de configuração fica em: ~/.sshControl/config.yaml
+  Na primeira execução, um template é criado automaticamente.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MODO INTERATIVO (TUI)
+  sc                        Abre menu interativo para selecionar host
+  sc -u <usuario>           Menu com usuário específico
+  sc -j <jump>              Menu via jump host
+  sc -p                     Menu com proxy reverso habilitado
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONEXÃO DIRETA
+  sc <host>                        Conecta a host do config.yaml
+  sc 192.168.1.50                  Conecta diretamente a IP
+  sc ubuntu@192.168.1.50           Especifica usuário
+  sc ubuntu@192.168.1.50:2222      Especifica usuário e porta
+  sc -j production-jump <host>     Conecta via jump host (por nome)
+  sc -j 1 <host>                   Conecta via jump host (por índice)
+  sc -p <host>                     Conecta com proxy reverso
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXECUÇÃO DE COMANDOS REMOTOS (Host Único)
+  sc -c "uptime" <host>                   Executa comando no host
+  sc -c "df -h" 192.168.1.50              Executa em IP direto
+  sc -u deploy -c "systemctl status nginx" <host>
+                                          Com usuário específico
+  sc -j 1 -c "cat /var/log/app.log" <host>
+                                          Via jump host
+  sc -a -c "comando" <host>               Solicita senha antes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EXECUÇÃO EM MÚLTIPLOS HOSTS
+  sc -c "uptime" -l web1 web2 web3        Em vários hosts do config
+  sc -c "free -h" -l 192.168.1.10 192.168.1.11
+                                          Em múltiplos IPs
+  sc -c "hostname" -l web1 192.168.1.50   Combina hosts e IPs
+  sc -j 1 -c "df -h" -l db1 db2 db3       Via jump host
+  sc -a -c "uptime" -l web1 web2 web3     Solicita senha uma vez antes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TAGS (Agrupamento de Hosts)
+  Hosts podem ter tags no config.yaml para agrupamento:
+
+  hosts:
+    - name: web1
+      host: 192.168.1.10
+      port: 22
+      tags: [web, production]
+
+  Use @tag para executar em todos os hosts de uma tag:
+  sc -c "uptime" -l @web                  Todos os hosts com tag "web"
+  sc -c "df -h" -l @web @db               Múltiplas tags
+  sc -c "hostname" -l @production server1 Combina tag e host
+
+  Na TUI, digite "/" e busque pelo nome da tag para filtrar.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AUTO-CRIAÇÃO DE HOSTS
+  Com auto_create: true no config.yaml, hosts não cadastrados são salvos
+  automaticamente após conexão bem-sucedida com a tag "autocreated".
+
+  Hosts com tag "autocreated" não aparecem na TUI, mas podem ser usados:
+  sc -c "uptime" -l @autocreated          Executa nos hosts auto-criados
+  sc -s                                   Lista inclui hosts autocreated
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROXY REVERSO
+  Compartilha proxy HTTP/HTTPS/FTP da máquina local com hosts remotos.
+  Configure no config.yaml:
+    config:
+      proxy: "192.168.0.1:3128"
+      proxy_port: 9999
+
+  sc -p <host>                            Conecta com proxy habilitado
+
+  No host remoto, configure:
+  export {https,http,ftp}_proxy=http://127.0.0.1:9999
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COMANDOS ÚTEIS
+  sc -s                     Lista servidores e jump hosts cadastrados
+  sc -v, sc --version       Exibe versão do sshControl
+  sc update                 Atualiza para versão mais recente
+  sc man                    Exibe este manual
+  sc --help                 Exibe ajuda rápida
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FLAGS DISPONÍVEIS
+  -u, --user <usuario>      Usuário SSH a ser usado
+  -j, --jump <jump>         Jump host (nome ou índice)
+  -c, --command <comando>   Comando a executar remotamente
+  -l, --list                Modo múltiplos hosts (requer -c)
+  -s, --servers             Lista servidores cadastrados
+  -p, --proxy               Habilita proxy reverso
+  -a, --ask-password        Solicita senha antes de conectar
+  -v, --version             Exibe versão
+  -h, --help                Exibe ajuda
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AUTENTICAÇÃO
+  Ordem de tentativa:
+  1. Chave SSH (configurada no config.yaml)
+  2. SSH Agent (se disponível)
+  3. Senha (interativa ou via -a)
+
+  A flag -a solicita senha antes de tentar conectar, útil para:
+  - Primeira conexão (antes de instalar chave)
+  - Automações em múltiplos hosts
+  - Servidores sem chave configurada
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MAIS INFORMAÇÕES
+  Repositório: https://github.com/alexeiev/sshControl
+  Issues:      https://github.com/alexeiev/sshControl/issues
+
+`
+	showWithPager(manual)
+}
+
 func init() {
 	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(manCmd)
 	rootCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
 	rootCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice, ex: production-jump ou 1)")
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
@@ -182,14 +341,14 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
 			os.Exit(1)
 		}
-		cmd.ConnectMultiple(cfg, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
+		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
 		return
 	}
 
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
+		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
 		return
 	}
 

@@ -19,16 +19,17 @@ const (
 const defaultConfigTemplate = `---
 config:
   default_user: ubuntu
+  auto_create: false          # Se true, salva hosts não cadastrados automaticamente com tag "autocreated"
   proxy: "192.168.0.1:3128"  # IP:PORT do proxy HTTP/HTTPS/FTP na máquina local
   proxy_port: 9999            # Porta local no host remoto para acessar o proxy
   users:
     - name: ubuntu
       ssh_keys:
-        - ~/.ssh/id_rsa
-        - ~/.ssh/id_ed25519
+        - ~/.ssh/ubuntu_id_rsa
+        - ~/.ssh/ubuntu_id_ed25519
     - name: devops
       ssh_keys:
-        - ~/.ssh/id_rsa
+        - ~/.ssh/devops_id_rsa
   jump_hosts:
     - name: production-jump
       host: jump.production.example.com
@@ -43,9 +44,16 @@ hosts:
   - name: dns
     host: 192.168.1.31
     port: 22
+    tags: 
+			- network
+			- infra
   - name: traefik
     host: 192.168.1.32
     port: 22
+    tags: 
+			- web
+			- proxy
+			- infra
 ...
 `
 
