@@ -384,6 +384,16 @@ func runUpdate(cobraCmd *cobra.Command, args []string) {
 
 	fmt.Printf("📦 Nova versão disponível: %s\n", release.TagName)
 	fmt.Println()
+
+	// Exibe as release notes se disponíveis
+	if release.Body != "" {
+		fmt.Println("📝 O que há de novo:")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Println(release.Body)
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Println()
+	}
+
 	fmt.Print("Deseja atualizar agora? [s/N]: ")
 
 	var response string
@@ -428,7 +438,7 @@ func checkForUpdatesBackground(currentVersion string) {
 			fmt.Fprintf(os.Stderr, "│  🔔 Nova versão disponível: %-30s  │\n", release.TagName)
 			fmt.Fprintf(os.Stderr, "│  Versão atual: %-44s │\n", currentVersion)
 			fmt.Fprintf(os.Stderr, "│                                                             │\n")
-			fmt.Fprintf(os.Stderr, "│  Para atualizar, execute:                                   │\n")
+			fmt.Fprintf(os.Stderr, "│  Para atualizar e ver as novidades, execute:                │\n")
 			fmt.Fprintf(os.Stderr, "│    sc update                                                │\n")
 			fmt.Fprintf(os.Stderr, "│    (ou 'sudo sc update' se necessário)                      │\n")
 			fmt.Fprintf(os.Stderr, "└─────────────────────────────────────────────────────────────┘\n")
