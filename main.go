@@ -95,18 +95,22 @@ Use -r para copiar diretórios recursivamente.`,
 }
 
 var cpUpCmd = &cobra.Command{
-	Use:   "up [flags] <arquivo_local> [destino_remoto] <hosts...>",
+	Use:   "up [flags] <arquivo_local> [destino_remoto] <host>  OU  up -l [flags] <hosts...> <arquivo_local> [destino_remoto]",
 	Short: "Upload de arquivo/diretório para servidor(es)",
 	Long: `Envia um arquivo ou diretório local para servidor(es) remoto(s).
 
 Se o destino remoto não for especificado, usa o diretório home do usuário (~).
 Use -l para enviar para múltiplos hosts em paralelo.
-Use -r para copiar diretórios recursivamente.`,
+Use -r para copiar diretórios recursivamente.
+
+Ordem dos argumentos:
+  - Host único:      sc cp up <arquivo_local> [destino_remoto] <host>
+  - Múltiplos hosts: sc cp up -l <hosts...> <arquivo_local> [destino_remoto]`,
 	Example: `  sc cp up ./config.yaml webserver              # Envia para ~/config.yaml
   sc cp up ./config.yaml /etc/app/ webserver    # Envia para /etc/app/config.yaml
-  sc cp up -l ./script.sh /opt/scripts/ web1 web2 web3
+  sc cp up -l web1 web2 web3 ./script.sh /opt/scripts/
   sc cp up -r ./dist/ /var/www/html/ webserver
-  sc cp up -j prod-jump -l ./app.jar /opt/app/ app1 app2`,
+  sc cp up -l app1 app2 -j prod-jump ./app.jar /opt/app/`,
 	Args: cobra.MinimumNArgs(2),
 	Run:  runCpUp,
 }
@@ -234,8 +238,10 @@ CÓPIA DE ARQUIVOS (SFTP)
                                          (default: dir_cp_default do config)
 
   Upload de arquivos para servidor(es):
-  sc cp up [flags] <local> [remoto] <hosts...>
-                                         Envia arquivo para host(s)
+  sc cp up [flags] <local> [remoto] <host>
+                                         Envia arquivo para um host
+  sc cp up -l [flags] <hosts...> <local> [remoto]
+                                         Envia para múltiplos hosts
                                          (default remoto: ~ home do usuário)
 
   Flags do cp:
@@ -251,7 +257,8 @@ CÓPIA DE ARQUIVOS (SFTP)
   sc cp down -j 1 db-prod /backup/dump.sql ./
   sc cp up ./config.yaml webserver
   sc cp up ./config.yaml /etc/app/ webserver
-  sc cp up -l ./script.sh /opt/ web1 web2 web3
+  sc cp up -l web1 web2 web3 ./script.sh /opt/
+  sc cp up -l @web ./deploy.sh /opt/
   sc cp up -r ./dist/ /var/www/html/ webserver
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -692,27 +699,62 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 }
 
 func runCpUp(cobraCmd *cobra.Command, args []string) {
-	localPath := args[0]
-
-	// Determina remotePath e hostArgs baseado no número de argumentos
-	// 2 args: <local> <host> -> usa home do usuário (~)
-	// 3+ args: <local> <remote> <hosts...>
+	var localPath string
 	var remotePath string
 	var hostArgs []string
 
-	if len(args) == 2 {
-		// Sem destino remoto especificado, usa home do usuário
-		remotePath = "~"
-		hostArgs = args[1:]
-	} else {
-		remotePath = args[1]
-		hostArgs = args[2:]
-	}
+	// Ordem dos argumentos depende do modo:
+	// - Múltiplos hosts (-l): sc cp up -l <hosts...> <arquivo_local> [destino_remoto]
+	// - Host único:           sc cp up <arquivo_local> [destino_remoto] <host>
+	if multipleHosts {
+		// Modo múltiplos hosts: hosts vêm primeiro, arquivo local por último
+		// Encontra o arquivo local (primeiro argumento que existe no filesystem)
+		localIdx := -1
+		for i := 0; i < len(args); i++ {
+			if _, err := os.Stat(args[i]); err == nil {
+				localIdx = i
+				break
+			}
+		}
 
-	// Verifica se arquivo local existe antes de conectar
-	if _, err := os.Stat(localPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Erro: Arquivo local '%s' não encontrado\n", localPath)
-		os.Exit(1)
+		if localIdx == -1 {
+			fmt.Fprintf(os.Stderr, "Erro: Nenhum arquivo local válido encontrado nos argumentos\n")
+			fmt.Fprintf(os.Stderr, "Uso: sc cp up -l <hosts...> <arquivo_local> [destino_remoto]\n")
+			os.Exit(1)
+		}
+
+		hostArgs = args[:localIdx]
+		localPath = args[localIdx]
+
+		if localIdx+1 < len(args) {
+			remotePath = args[localIdx+1]
+		} else {
+			remotePath = "~"
+		}
+
+		if len(hostArgs) == 0 {
+			fmt.Fprintf(os.Stderr, "Erro: Nenhum host especificado\n")
+			fmt.Fprintf(os.Stderr, "Uso: sc cp up -l <hosts...> <arquivo_local> [destino_remoto]\n")
+			os.Exit(1)
+		}
+	} else {
+		// Modo host único: arquivo local primeiro
+		localPath = args[0]
+
+		if len(args) == 2 {
+			// Sem destino remoto especificado, usa home do usuário
+			remotePath = "~"
+			hostArgs = args[1:]
+		} else {
+			remotePath = args[1]
+			hostArgs = args[2:]
+		}
+
+		// Verifica se arquivo local existe
+		if _, err := os.Stat(localPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Erro: Arquivo local '%s' não encontrado\n", localPath)
+			os.Exit(1)
+		}
 	}
 
 	// Inicializa configuração

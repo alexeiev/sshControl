@@ -20,6 +20,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🔑 **Auto-Instalação de Chaves**: Instala automaticamente sua chave pública no servidor após primeira conexão
 - 🔒 **Controle de Senha**: Flag `-a` para solicitar senha antecipadamente (ideal para automações)
 - 📝 **Auto-Criação de Hosts**: Salva automaticamente hosts não cadastrados no config.yaml
+- 📁 **Cópia de Arquivos**: Transferência de arquivos via SFTP com suporte a múltiplos hosts
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
 
 ## Instalação
@@ -73,6 +74,7 @@ Na primeira execução, o sshControl cria automaticamente o arquivo de configura
 config:
   default_user: ubuntu
   auto_create: false          # Se true, salva hosts não cadastrados automaticamente
+  dir_cp_default: ~/sshControl  # Diretório padrão para downloads via 'sc cp down'
   proxy: "192.168.0.1:3128"  # IP:PORT do proxy HTTP/HTTPS/FTP na máquina local
   proxy_port: 9999            # Porta local no host remoto para acessar o proxy
   users:
@@ -217,6 +219,54 @@ done
 # Com -a: solicita senha uma vez antes de executar (quando chaves não estão instaladas)
 sc -a -c "uptime" -l web1 web2 web3
 ```
+
+### Cópia de Arquivos (SFTP)
+
+**Download de arquivos do servidor remoto**:
+```bash
+# Baixa arquivo para diretório padrão (dir_cp_default do config)
+sc cp down webserver /var/log/app.log
+
+# Baixa arquivo para diretório específico
+sc cp down webserver /var/log/app.log ./logs/
+
+# Baixa diretório recursivamente
+sc cp down -r webserver /etc/nginx/ ./nginx-backup/
+
+# Com jump host
+sc cp down -j 1 db-prod /backup/dump.sql ./
+
+# Usando ~ para home do usuário remoto
+sc cp down webserver ~/app/config.yaml ./
+```
+
+**Upload de arquivos para servidor(es)**:
+```bash
+# Envia para o home do usuário remoto (~)
+sc cp up ./config.yaml webserver
+
+# Envia para diretório específico
+sc cp up ./config.yaml /etc/app/ webserver
+
+# Envia para múltiplos hosts em paralelo
+sc cp up -l web1 web2 web3 ./script.sh /opt/scripts/ 
+
+# Envia diretório recursivamente
+sc cp up -r ./dist/ /var/www/html/ webserver
+
+# Com jump host e múltiplos hosts
+sc cp up -l app1 app2 -j prod-jump ./app.jar /opt/app/
+
+# Usando tags
+sc cp up -l @web ./deploy.sh /opt/
+```
+
+**Flags do comando cp**:
+- `-r, --recursive`: Copia diretórios recursivamente
+- `-l, --list`: Envia para múltiplos hosts (apenas `up`)
+- `-j, --jump <jump>`: Usa jump host
+- `-u, --user <user>`: Usa usuário específico
+- `-a, --ask-password`: Solicita senha antes
 
 ### Comandos Úteis
 
@@ -559,6 +609,71 @@ Exibe resultados organizados com:
 - Exit code de cada comando
 - Tempo total de execução
 - Resumo com contadores
+
+### Cópia de Arquivos (SFTP)
+
+O sshControl permite transferir arquivos entre a máquina local e servidores remotos via SFTP.
+
+**Configuração**:
+
+```yaml
+config:
+  dir_cp_default: ~/sshControl  # Diretório padrão para downloads
+```
+
+**Download (`sc cp down`)**:
+
+Baixa arquivos ou diretórios do servidor remoto para a máquina local.
+
+```bash
+# Sintaxe
+sc cp down [flags] <host> <caminho_remoto> [destino_local]
+
+# Se destino_local não for especificado, usa dir_cp_default do config
+sc cp down webserver /var/log/app.log
+
+# Baixar diretório recursivamente
+sc cp down -r webserver /etc/nginx/ ./backup/
+```
+
+**Upload (`sc cp up`)**:
+
+Envia arquivos ou diretórios para servidor(es) remoto(s).
+
+```bash
+# Sintaxe - Host único
+sc cp up [flags] <arquivo_local> [destino_remoto] <host>
+
+# Sintaxe - Múltiplos hosts (hosts vêm após -l)
+sc cp up -l [flags] <hosts...> <arquivo_local> [destino_remoto]
+
+# Se destino_remoto não for especificado, usa o home do usuário (~)
+sc cp up ./config.yaml webserver
+
+# Enviar para múltiplos hosts (hosts após -l)
+sc cp up -l web1 web2 web3 ./script.sh /opt/
+
+# Enviar diretório recursivamente
+sc cp up -r ./dist/ /var/www/html/ webserver
+```
+
+**Características**:
+
+- **Barra de progresso**: Exibe progresso em tempo real durante transferências
+- **Múltiplos hosts**: Upload simultâneo para vários servidores com `-l`
+- **Recursivo**: Copia diretórios completos com `-r`
+- **Jump hosts**: Suporte total a conexões via bastion com `-j`
+- **Expansão de `~`**: Detecta e corrige automaticamente a expansão do shell local
+
+**Nota sobre `~`**:
+
+Quando você usa `~` no caminho remoto, o shell local pode expandir para seu home local. O sshControl detecta isso automaticamente e converte para o home do usuário remoto:
+
+```bash
+# Mesmo que o shell expanda ~/logs para /Users/seu_usuario/logs,
+# o sshControl converte para /home/ubuntu/logs no servidor
+sc cp down webserver ~/logs/app.log ./
+```
 
 ### Auto-Atualização
 
