@@ -239,10 +239,11 @@ func ParseConnectionString(input string) (user, host string, port int, err error
 }
 
 // ListServers exibe todos os servidores e jump hosts cadastrados no config
-func ListServers(cfg *config.ConfigFile) {
+// Se tagFilter não estiver vazio, filtra os servidores pela tag especificada
+func ListServers(cfg *config.ConfigFile, tagFilter string) {
 	fmt.Println()
 
-	// Exibe Jump Hosts se houver algum
+	// Exibe Jump Hosts se houver algum (sempre mostra, independente do filtro)
 	if len(cfg.Config.JumpHosts) > 0 {
 		fmt.Println("🔗 Jump Hosts cadastrados:")
 		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -262,19 +263,35 @@ func ListServers(cfg *config.ConfigFile) {
 		fmt.Println()
 	}
 
+	// Filtra servidores por tag se especificado
+	var hostsToShow []config.Host
+	if tagFilter != "" {
+		hostsToShow = cfg.FindHostsByTag(tagFilter)
+	} else {
+		hostsToShow = cfg.Hosts
+	}
+
 	// Exibe Servidores
-	if len(cfg.Hosts) == 0 {
-		fmt.Println("ℹ️  Nenhum servidor cadastrado no config.yaml")
+	if len(hostsToShow) == 0 {
+		if tagFilter != "" {
+			fmt.Printf("ℹ️  Nenhum servidor encontrado com a tag '%s'\n", tagFilter)
+		} else {
+			fmt.Println("ℹ️  Nenhum servidor cadastrado no config.yaml")
+		}
 		fmt.Println()
 		return
 	}
 
-	fmt.Println("📋 Servidores cadastrados:")
+	if tagFilter != "" {
+		fmt.Printf("📋 Servidores com tag '%s':\n", tagFilter)
+	} else {
+		fmt.Println("📋 Servidores cadastrados:")
+	}
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("%-20s %-25s %s\n", "Nome", "Host:Porta", "Tags")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	for _, host := range cfg.Hosts {
+	for _, host := range hostsToShow {
 		hostPort := fmt.Sprintf("%s:%d", host.Host, host.Port)
 		tags := "-"
 		if len(host.Tags) > 0 {
@@ -284,6 +301,6 @@ func ListServers(cfg *config.ConfigFile) {
 	}
 
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("Total: %d servidor(es)\n", len(cfg.Hosts))
+	fmt.Printf("Total: %d servidor(es)\n", len(hostsToShow))
 	fmt.Println()
 }
