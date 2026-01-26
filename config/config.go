@@ -24,12 +24,13 @@ type JumpHost struct {
 
 // Config representa a seção de configuração global
 type Config struct {
-	DefaultUser string     `yaml:"default_user"`
-	AutoCreate  bool       `yaml:"auto_create"` // Se true, salva hosts não cadastrados automaticamente
-	User        []User     `yaml:"users"`
-	JumpHosts   []JumpHost `yaml:"jump_hosts"`
-	Proxy       string     `yaml:"proxy"`      // IP:PORT do proxy (ex: 10.0.230.100:8080)
-	ProxyPort   int        `yaml:"proxy_port"` // Porta local no host remoto (ex: 9999)
+	DefaultUser  string     `yaml:"default_user"`
+	AutoCreate   bool       `yaml:"auto_create"`    // Se true, salva hosts não cadastrados automaticamente
+	DirCpDefault string     `yaml:"dir_cp_default"` // Diretório padrão para downloads (ex: ~/sshControl)
+	User         []User     `yaml:"users"`
+	JumpHosts    []JumpHost `yaml:"jump_hosts"`
+	Proxy        string     `yaml:"proxy"`      // IP:PORT do proxy (ex: 10.0.230.100:8080)
+	ProxyPort    int        `yaml:"proxy_port"` // Porta local no host remoto (ex: 9999)
 }
 
 // Host representa um host SSH
@@ -91,6 +92,17 @@ func (c *Config) GetProxyConfig() (address string, port int, configured bool) {
 	}
 
 	return c.Proxy, port, true
+}
+
+// GetDownloadDir retorna o diretório padrão para downloads
+// Se não configurado, retorna ~/sshControl como padrão
+func (c *Config) GetDownloadDir() string {
+	if c.DirCpDefault != "" {
+		return ExpandHomePath(c.DirCpDefault)
+	}
+	// Padrão: ~/sshControl
+	home, _ := os.UserHomeDir()
+	return home + "/sshControl"
 }
 
 // GetDefaultUser retorna o primeiro usuário da configuração
