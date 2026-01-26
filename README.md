@@ -275,8 +275,8 @@ sc cp up -l @web ./deploy.sh /opt/
 sc -s
 
 # Listar servidores filtrados por tag
-sc -s ansible
-sc -s production
+sc -s @ansible
+sc -s @production
 
 # Verificar versão
 sc --version
@@ -410,17 +410,17 @@ Mostrará apenas hosts que possuem a tag "production".
 
 **Listagem e Filtro por Tags**:
 
-O comando `sc -s` exibe as tags de cada host. Use `sc -s <tag>` para filtrar:
+O comando `sc -s` exibe as tags de cada host. Use `sc -s @tag` para filtrar:
 
 ```bash
 # Lista todos os servidores
 sc -s
 
 # Lista apenas servidores com tag "web"
-sc -s web
+sc -s @web
 
 # Lista apenas servidores com tag "production"
-sc -s production
+sc -s @production
 ```
 
 Exemplo de saída:
