@@ -45,15 +45,15 @@ hosts:
     host: 192.168.1.31
     port: 22
     tags: 
-			- network
-			- infra
+      - network
+      - infra
   - name: traefik
     host: 192.168.1.32
     port: 22
     tags: 
-			- web
-			- proxy
-			- infra
+      - web
+      - proxy
+      - infra
 ...
 `
 
