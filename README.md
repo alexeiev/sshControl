@@ -274,6 +274,10 @@ sc cp up -l @web ./deploy.sh /opt/
 # Listar servidores e jump hosts cadastrados
 sc -s
 
+# Listar servidores filtrados por tag
+sc -s ansible
+sc -s production
+
 # Verificar versão
 sc --version
 
@@ -404,18 +408,29 @@ Filtrar hosts...> production
 
 Mostrará apenas hosts que possuem a tag "production".
 
-**Listagem de Tags**:
+**Listagem e Filtro por Tags**:
 
-O comando `sc -s` exibe as tags de cada host:
+O comando `sc -s` exibe as tags de cada host. Use `sc -s <tag>` para filtrar:
 
+```bash
+# Lista todos os servidores
+sc -s
+
+# Lista apenas servidores com tag "web"
+sc -s web
+
+# Lista apenas servidores com tag "production"
+sc -s production
 ```
-📋 Servidores cadastrados:
+
+Exemplo de saída:
+```
+📋 Servidores com tag 'web':
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Nome                 Host:Porta                Tags
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 web1                 192.168.1.10:22           web, production, nginx
 web2                 192.168.1.11:22           web, production, nginx
-db-master            192.168.1.20:22           db, production, mysql
 ```
 
 **Casos de Uso**:
