@@ -20,6 +20,7 @@ const defaultConfigTemplate = `---
 config:
   default_user: ubuntu
   auto_create: false          # Se true, salva hosts não cadastrados automaticamente com tag "autocreated"
+  dir_cp_default: ~/sshControl  # Diretório padrão para downloads via 'sc cp down'
   proxy: "192.168.0.1:3128"  # IP:PORT do proxy HTTP/HTTPS/FTP na máquina local
   proxy_port: 9999            # Porta local no host remoto para acessar o proxy
   users:
