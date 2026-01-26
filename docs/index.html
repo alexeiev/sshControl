@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="sshControl - Gerenciador de conexões SSH com interface interativa (TUI) e modo CLI direto">
-    <meta name="keywords" content="ssh, terminal, cli, tui, jump host, bastion, devops">
+    <meta name="description" content="sshControl - Gerenciador de conexões SSH com interface interativa (TUI) e modo CLI direto. Suporte a jump hosts, tags, proxy reverso, SFTP e execução em lote.">
+    <meta name="keywords" content="ssh, terminal, cli, tui, jump host, bastion, devops, sftp, proxy, tags">
     <title>sshControl - Gerenciador de Conexões SSH</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🚀 sshControl</h1>
+            <h1>sshControl</h1>
             <p class="tagline">Gerenciador de conexões SSH com interface interativa</p>
         </header>
 
@@ -21,7 +21,7 @@
                 <div class="command-box">
                     <code>curl -fsSL https://sshcontrol.alexeiev.me/install | bash</code>
                     <button onclick="copyToClipboard()" class="copy-btn" title="Copiar comando">
-                        📋
+                        <span class="copy-icon">&#128203;</span>
                     </button>
                 </div>
                 <p class="install-note">Suporta Linux e macOS (Intel e Apple Silicon)</p>
@@ -32,32 +32,62 @@
             <h2>Características</h2>
             <div class="feature-grid">
                 <div class="feature">
-                    <div class="feature-icon">🖥️</div>
+                    <div class="feature-icon">&#128421;</div>
                     <h3>Modo Interativo (TUI)</h3>
-                    <p>Interface visual elegante para navegar e selecionar hosts</p>
+                    <p>Menu visual para seleção de hosts com filtro por tags</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">⚡</div>
+                    <div class="feature-icon">&#9889;</div>
                     <h3>Modo Direto</h3>
                     <p>Conecte rapidamente via linha de comando</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">🔗</div>
+                    <div class="feature-icon">&#128279;</div>
                     <h3>Jump Hosts</h3>
                     <p>Suporte completo para conexões via bastion/jump hosts</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">📦</div>
+                    <div class="feature-icon">&#127991;</div>
+                    <h3>Tags para Hosts</h3>
+                    <p>Agrupe hosts por tags e execute comandos em lote por grupo</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#127760;</div>
+                    <h3>Proxy Reverso</h3>
+                    <p>Compartilhe proxy HTTP/HTTPS/FTP da máquina local com hosts remotos</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128230;</div>
                     <h3>Execução em Lote</h3>
                     <p>Execute comandos em múltiplos hosts simultaneamente</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">🔐</div>
+                    <div class="feature-icon">&#128274;</div>
                     <h3>Autenticação Flexível</h3>
                     <p>Suporte para chaves SSH, SSH Agent e senha</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">🔄</div>
+                    <div class="feature-icon">&#128273;</div>
+                    <h3>Auto-Instalação de Chaves</h3>
+                    <p>Instala automaticamente sua chave pública no servidor após primeira conexão</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128221;</div>
+                    <h3>Auto-Criação de Hosts</h3>
+                    <p>Salva automaticamente hosts não cadastrados no config.yaml</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128193;</div>
+                    <h3>Cópia de Arquivos</h3>
+                    <p>Transferência de arquivos via SFTP com suporte a múltiplos hosts</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128274;</div>
+                    <h3>Controle de Senha</h3>
+                    <p>Flag -a para solicitar senha antecipadamente (ideal para automações)</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128260;</div>
                     <h3>Auto-Atualização</h3>
                     <p>Atualize para a versão mais recente com um comando</p>
                 </div>
@@ -69,7 +99,10 @@
             <div class="example-grid">
                 <div class="example">
                     <h4>Modo Interativo</h4>
-                    <pre><code>sc</code></pre>
+                    <pre><code>sc
+sc -u admin
+sc -j production-jump
+sc -p</code></pre>
                 </div>
                 <div class="example">
                     <h4>Conexão Direta</h4>
@@ -80,37 +113,99 @@ sc ubuntu@host:2222</code></pre>
                 <div class="example">
                     <h4>Via Jump Host</h4>
                     <pre><code>sc -j production-jump webserver
-sc -j 1 webserver</code></pre>
+sc -j 1 webserver
+sc -j 1 -p webserver</code></pre>
                 </div>
                 <div class="example">
                     <h4>Comando Remoto</h4>
-                    <pre><code>sc -c "uptime" webserver</code></pre>
+                    <pre><code>sc -c "uptime" webserver
+sc -j 1 -c "df -h" app-server</code></pre>
                 </div>
                 <div class="example">
                     <h4>Múltiplos Hosts</h4>
-                    <pre><code>sc -c "df -h" -l web1 web2 web3</code></pre>
+                    <pre><code>sc -c "df -h" -l web1 web2 web3
+sc -a -c "uptime" -l web1 web2</code></pre>
                 </div>
                 <div class="example">
-                    <h4>Atualização</h4>
-                    <pre><code>sc update</code></pre>
+                    <h4>Usando Tags</h4>
+                    <pre><code>sc -c "uptime" -l @web
+sc -c "df -h" -l @production
+sc -s @ansible</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Download de Arquivos</h4>
+                    <pre><code>sc cp down webserver /var/log/app.log
+sc cp down -r webserver /etc/nginx/ ./
+sc cp down -j 1 db /backup/dump.sql</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Upload de Arquivos</h4>
+                    <pre><code>sc cp up ./config.yaml webserver
+sc cp up -l web1 web2 ./script.sh /opt/
+sc cp up -r ./dist/ /var/www/ webserver</code></pre>
+                </div>
+                <div class="example">
+                    <h4>Comandos Úteis</h4>
+                    <pre><code>sc -s
+sc -s @production
+sc --version
+sc update
+sc man</code></pre>
                 </div>
             </div>
+        </section>
+
+        <section class="config-example">
+            <h2>Exemplo de Configuração</h2>
+            <div class="config-box">
+                <pre><code>config:
+  default_user: ubuntu
+  auto_create: false
+  dir_cp_default: ~/sshControl
+  proxy: "192.168.0.1:3128"
+  proxy_port: 9999
+  users:
+    - name: ubuntu
+      ssh_keys:
+        - ~/.ssh/id_rsa
+        - ~/.ssh/id_ed25519
+  jump_hosts:
+    - name: production-jump
+      host: jump.production.example.com
+      user: ubuntu
+      port: 22
+
+hosts:
+  - name: webserver
+    host: 192.168.1.50
+    port: 22
+    tags:
+      - web
+      - production
+  - name: database
+    host: 192.168.1.51
+    port: 22
+    tags:
+      - db
+      - production</code></pre>
+            </div>
+            <p class="config-note">Arquivo de configuração: <code>~/.sshControl/config.yaml</code></p>
         </section>
 
         <section class="links">
             <h2>Links</h2>
             <div class="link-buttons">
                 <a href="https://github.com/alexeiev/sshControl" class="btn btn-primary" target="_blank">
-                    📁 GitHub
+                    GitHub
                 </a>
                 <a href="https://github.com/alexeiev/sshControl/releases" class="btn btn-secondary" target="_blank">
-                    📦 Releases
+                    Releases
                 </a>
                 <a href="https://github.com/alexeiev/sshControl/blob/main/README.md" class="btn btn-secondary" target="_blank">
-                    📖 Documentação
+                    Documentação
                 </a>
                 <a href="https://github.com/alexeiev/sshControl/issues" class="btn btn-secondary" target="_blank">
-                    🐛 Issues
+                    Issues
                 </a>
             </div>
         </section>
@@ -118,6 +213,14 @@ sc -j 1 webserver</code></pre>
         <section class="manual-install">
             <h2>Outras Opções de Instalação</h2>
             <div class="install-options">
+                <div class="option">
+                    <h4>Instalação Customizada</h4>
+                    <pre><code># Instalar em diretório específico
+curl -fsSL https://sshcontrol.alexeiev.me/install | bash -s -- --dir=$HOME/.local/bin
+
+# Ver opções disponíveis
+curl -fsSL https://sshcontrol.alexeiev.me/install | bash -s -- --help</code></pre>
+                </div>
                 <div class="option">
                     <h4>Instalação Manual</h4>
                     <p>Baixe o binário pré-compilado das <a href="https://github.com/alexeiev/sshControl/releases/latest">releases</a></p>
@@ -145,9 +248,10 @@ make build</code></pre>
             const command = 'curl -fsSL https://sshcontrol.alexeiev.me/install | bash';
             navigator.clipboard.writeText(command).then(() => {
                 const btn = document.querySelector('.copy-btn');
-                btn.textContent = '✅';
+                const icon = btn.querySelector('.copy-icon');
+                icon.innerHTML = '&#10003;';
                 setTimeout(() => {
-                    btn.textContent = '📋';
+                    icon.innerHTML = '&#128203;';
                 }, 2000);
             }).catch(err => {
                 console.error('Erro ao copiar:', err);
