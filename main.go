@@ -49,7 +49,7 @@ Para ver exemplos de uso e manual completo, execute: sc man`,
   sc -c "comando" <host>       # Executa comando remoto
   sc -c "comando" -l <hosts>   # Executa em múltiplos hosts
   sc -s                        # Lista servidores cadastrados
-  sc -s <tag>                  # Lista servidores filtrados por tag
+  sc -s @tag                   # Lista servidores filtrados por tag
   sc man                       # Exibe manual completo com exemplos`,
 	Args: cobra.ArbitraryArgs,
 	Run:  runCommand,
@@ -280,7 +280,7 @@ PROXY REVERSO
 
 COMANDOS ÚTEIS
   sc -s                     Lista servidores e jump hosts cadastrados
-  sc -s <tag>               Lista servidores filtrados por tag
+  sc -s @tag                Lista servidores filtrados por tag
   sc -v, sc --version       Exibe versão do sshControl
   sc update                 Atualiza para versão mais recente
   sc cp                     Copia arquivos via SFTP (veja sc cp --help)
@@ -334,7 +334,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice, ex: production-jump ou 1)")
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
 	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (requer -c)")
-	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista servidores (use 'sc -s <tag>' para filtrar por tag)")
+	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista servidores (use 'sc -s @tag' para filtrar por tag)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Exibe a versão do sshControl")
 	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
 	rootCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação (útil para automações)")
@@ -377,11 +377,17 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	}
 
 	// Se a flag -s foi usada, lista os servidores e sai
-	// Se houver um argumento adicional, usa como filtro de tag
+	// Se houver um argumento adicional com @tag, usa como filtro de tag
 	if showServers {
 		tagFilter := ""
 		if len(args) > 0 {
-			tagFilter = args[0]
+			arg := args[0]
+			if strings.HasPrefix(arg, "@") {
+				tagFilter = strings.TrimPrefix(arg, "@")
+			} else {
+				fmt.Fprintf(os.Stderr, "Erro: Use @tag para filtrar por tag (ex: sc -s @%s)\n", arg)
+				os.Exit(1)
+			}
 		}
 		cmd.ListServers(cfg, tagFilter)
 		return

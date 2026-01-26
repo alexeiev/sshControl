@@ -5,6 +5,13 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.4.1] - 2026-01-26
+
+### Fix
+
+- Filtro por tag na listagem de servidores: `sc -s @tag` para filtrar hosts por tag (consistente com `-l @tag`)
+
+
 ## [0.4.0] - 2026-01-26
 
 ### Added
@@ -18,7 +25,6 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Suporte a jump hosts com flag `-j`
 - Campo `dir_cp_default` no `config.yaml` para definir diretório padrão de downloads
 - Detecção automática de expansão de `~` pelo shell local, convertendo para home do usuário remoto
-- Filtro por tag na listagem de servidores: `sc -s <tag>` para filtrar hosts por tag
 
 ### Changed
 
