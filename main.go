@@ -350,8 +350,8 @@ func init() {
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
-	// Verifica atualizações em background (não bloqueante, com timeout de 2s)
-	checkForUpdatesBackground(version)
+	// Inicia verificação de atualizações em background (não bloqueante)
+	updateResultChan := checkForUpdatesBackground(version)
 
 	// Se a flag -v foi usada, exibe a versão e sai
 	if showVersion {
@@ -449,6 +449,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
+		showUpdateNotification(updateResultChan, version)
 		return
 	}
 
@@ -456,6 +457,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	if len(args) > 0 {
 		hostArg := args[0]
 		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
+		showUpdateNotification(updateResultChan, version)
 		return
 	}
 
@@ -468,6 +470,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 
 	// Modo interativo (menu)
 	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version, proxyEnabled)
+	showUpdateNotification(updateResultChan, version)
 }
 
 func runUpdate(cobraCmd *cobra.Command, args []string) {
@@ -523,10 +526,16 @@ func runUpdate(cobraCmd *cobra.Command, args []string) {
 	fmt.Println("Execute 'sc --version' para confirmar a nova versão.")
 }
 
-// checkForUpdatesBackground verifica atualizações em background e notifica o usuário
-func checkForUpdatesBackground(currentVersion string) {
-	// Timeout de 2 segundos para não atrasar a execução
-	done := make(chan bool, 1)
+// updateCheckResult armazena o resultado da verificação de atualização
+type updateCheckResult struct {
+	release   *updater.Release
+	hasUpdate bool
+}
+
+// checkForUpdatesBackground inicia verificação de atualizações em background
+// Retorna um canal que receberá o resultado (ou nil após timeout)
+func checkForUpdatesBackground(currentVersion string) <-chan *updateCheckResult {
+	resultChan := make(chan *updateCheckResult, 1)
 
 	go func() {
 		u := updater.New(currentVersion)
@@ -534,15 +543,40 @@ func checkForUpdatesBackground(currentVersion string) {
 
 		// Ignora erros silenciosamente (network issues, etc)
 		if err != nil {
-			done <- true
+			resultChan <- nil
 			return
 		}
 
-		// Se houver atualização, mostra notificação
 		if hasUpdate {
+			resultChan <- &updateCheckResult{release: release, hasUpdate: true}
+		} else {
+			resultChan <- nil
+		}
+	}()
+
+	// Retorna canal com timeout embutido
+	timeoutChan := make(chan *updateCheckResult, 1)
+	go func() {
+		select {
+		case result := <-resultChan:
+			timeoutChan <- result
+		case <-time.After(2 * time.Second):
+			timeoutChan <- nil
+		}
+	}()
+
+	return timeoutChan
+}
+
+// showUpdateNotification exibe a notificação de atualização se disponível
+func showUpdateNotification(resultChan <-chan *updateCheckResult, currentVersion string) {
+	// Tenta obter o resultado (não bloqueia se ainda não estiver pronto)
+	select {
+	case result := <-resultChan:
+		if result != nil && result.hasUpdate {
 			fmt.Fprintf(os.Stderr, "\n")
 			fmt.Fprintf(os.Stderr, "┌─────────────────────────────────────────────────────────────┐\n")
-			fmt.Fprintf(os.Stderr, "│  🔔 Nova versão disponível: %-30s  │\n", release.TagName)
+			fmt.Fprintf(os.Stderr, "│  🔔 Nova versão disponível: %-30s  │\n", result.release.TagName)
 			fmt.Fprintf(os.Stderr, "│  Versão atual: %-44s │\n", currentVersion)
 			fmt.Fprintf(os.Stderr, "│                                                             │\n")
 			fmt.Fprintf(os.Stderr, "│  Para atualizar e ver as novidades, execute:                │\n")
@@ -551,16 +585,8 @@ func checkForUpdatesBackground(currentVersion string) {
 			fmt.Fprintf(os.Stderr, "└─────────────────────────────────────────────────────────────┘\n")
 			fmt.Fprintf(os.Stderr, "\n")
 		}
-
-		done <- true
-	}()
-
-	// Aguarda até 2 segundos
-	select {
-	case <-done:
-		return
-	case <-time.After(2 * time.Second):
-		return
+	default:
+		// Resultado ainda não disponível, ignora
 	}
 }
 
