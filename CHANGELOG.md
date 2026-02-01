@@ -5,9 +5,28 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.5.0] - 2026-02-01
+
+### Added
+
+- **Port Forward (Túnel SSH)**: Novo comando `sc port-forward` para encaminhar portas locais para remotas
+  - Sintaxe: `sc port-forward <host> <local_port:remote_port>`
+  - Similar ao `kubectl port-forward` ou `ssh -L`
+  - Logs em tempo real de cada conexão (origem, bytes transferidos, duração)
+  - Estatísticas da sessão ao encerrar (total de conexões, bytes enviados/recebidos)
+  - Suporte a jump hosts (`-j`), usuário específico (`-u`) e senha (`-a`)
+  - Encerramento gracioso com Ctrl+C
+- Novo arquivo `cmd/port_forward.go` com implementação completa do port forwarding
+
+## [0.4.2] - 2026-01-27
+
+### Fixed
+
+- Correção do CheckUpdater sendo executado antes da conexão SSH (causava delay na conexão)
+
 ## [0.4.1] - 2026-01-26
 
-### Fix
+### Fixed
 
 - Filtro por tag na listagem de servidores: `sc -s @tag` para filtrar hosts por tag (consistente com `-l @tag`)
 
@@ -156,7 +175,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/alexeiev/sshControl/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/alexeiev/sshControl/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/alexeiev/sshControl/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/alexeiev/sshControl/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/alexeiev/sshControl/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/alexeiev/sshControl/compare/v0.2.1.1...v0.3.0

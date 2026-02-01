@@ -21,6 +21,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🔒 **Controle de Senha**: Flag `-a` para solicitar senha antecipadamente (ideal para automações)
 - 📝 **Auto-Criação de Hosts**: Salva automaticamente hosts não cadastrados no config.yaml
 - 📁 **Cópia de Arquivos**: Transferência de arquivos via SFTP com suporte a múltiplos hosts
+- 🚇 **Port Forward**: Encaminhe portas locais para remotas via túnel SSH (similar ao kubectl port-forward)
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
 
 ## Instalação
@@ -285,6 +286,9 @@ sc --version
 sc update
 # Ou com sudo se instalado em /usr/local/bin
 sudo sc update
+
+# Port forward (túnel SSH)
+sc port-forward webserver 8080:80
 
 # Manual completo com exemplos detalhados
 sc man
@@ -567,6 +571,63 @@ curl -I http://google.com
 - O tunnel permanece ativo durante toda a sessão SSH
 - Com jump host, o proxy é configurado apenas no host final (target), não no jump host
 - O proxy deve estar acessível a partir da máquina onde você executa o `sc`
+
+### Port Forward (Túnel SSH)
+
+O sshControl permite encaminhar uma porta local para uma porta remota através de um túnel SSH, similar ao `kubectl port-forward` ou `ssh -L`.
+
+**Sintaxe**:
+
+```bash
+sc port-forward [flags] <host> <local_port:remote_port>
+```
+
+**Exemplos**:
+
+```bash
+# Encaminha porta local 8080 para porta remota 80
+sc port-forward webserver 8080:80
+
+# Acessa MySQL remoto (3306) via porta local 3307
+sc port-forward db-server 3307:3306
+
+# Via jump host
+sc port-forward -j production-jump db-prod 5433:5432
+
+# Com usuário específico
+sc port-forward -u deploy app-server 9000:8080
+
+# Solicita senha antes de conectar
+sc port-forward -a webserver 8080:80
+```
+
+**Características**:
+
+- **Logs em tempo real**: Mostra cada conexão com origem, bytes transferidos e duração
+- **Estatísticas da sessão**: Ao encerrar (Ctrl+C), exibe total de conexões e bytes
+- **Suporte completo**: Jump hosts (`-j`), usuário específico (`-u`), senha (`-a`)
+
+**Exemplo de saída**:
+
+```
+🚇 Port Forward Ativo
+   Local:  127.0.0.1:8080
+   Remoto: 127.0.0.1:80 (via webserver)
+
+📋 Log de conexões:
+────────────────────────────────────────────────────────────────
+[14:32:15] #1 ✅ Conexão de 127.0.0.1:52341
+[14:32:18] #1 🔚 Encerrada (↑1.2 KB ↓4.5 KB)
+[14:33:01] #2 ✅ Conexão de 127.0.0.1:52342
+...
+```
+
+**Casos de Uso**:
+
+1. **Acesso a bancos de dados**: Conecte-se a MySQL/PostgreSQL remotos via localhost
+2. **APIs internas**: Acesse APIs que só estão disponíveis na rede interna
+3. **Dashboards**: Acesse interfaces web de monitoramento (Grafana, Kibana, etc.)
+4. **Debug**: Conecte debuggers a aplicações remotas
 
 ### Autenticação
 
