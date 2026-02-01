@@ -26,23 +26,26 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Get tag message
-        id: tag_message
+      - name: Extract release notes from CHANGELOG
+        id: changelog
         run: |
-          # Extrai a mensagem da tag anotada (exclui a primeira linha que é o título)
-          TAG_MESSAGE=$(git tag -l --format='%(contents:body)' ${{ steps.version.outputs.VERSION }})
+          # Extrai a versão sem o prefixo 'v' (ex: v0.5.0 -> 0.5.0)
+          VERSION_NUMBER="${{ steps.version.outputs.VERSION }}"
+          VERSION_NUMBER="${VERSION_NUMBER#v}"
 
-          # Se não houver body, usa o subject (primeira linha)
-          if [ -z "$TAG_MESSAGE" ]; then
-            TAG_MESSAGE=$(git tag -l --format='%(contents:subject)' ${{ steps.version.outputs.VERSION }})
-          fi
+          # Extrai a seção do CHANGELOG.md para esta versão
+          # Pega tudo entre ## [X.X.X] e o próximo ## [
+          RELEASE_NOTES=$(awk -v ver="$VERSION_NUMBER" '
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
 
-          # Escapa caracteres especiais para o GitHub Actions
-          TAG_MESSAGE="${TAG_MESSAGE//'%'/'%25'}"
-          TAG_MESSAGE="${TAG_MESSAGE//$'\n'/'%0A'}"
-          TAG_MESSAGE="${TAG_MESSAGE//$'\r'/'%0D'}"
-
-          echo "MESSAGE=$TAG_MESSAGE" >> $GITHUB_OUTPUT
+          # Salva em arquivo para preservar formatação
+          echo "$RELEASE_NOTES" > /tmp/release_notes.md
 
       - name: Build binaries
         run: |
@@ -78,6 +81,6 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/checksums.txt
-          body: ${{ steps.tag_message.outputs.MESSAGE }}
+          body_path: /tmp/release_notes.md
           draft: false
           prerelease: false
