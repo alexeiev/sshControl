@@ -80,6 +80,30 @@ var cpCmd = &cobra.Command{
 Suporta download (down) e upload (up), com opção recursiva para diretórios.`,
 }
 
+var pfCmd = &cobra.Command{
+	Use:   "port-forward [flags] <host> <local_port:remote_port>",
+	Short: "Encaminha uma porta local para uma porta remota via SSH",
+	Long: `Cria um túnel SSH para encaminhar conexões de uma porta local para uma porta remota.
+
+Similar ao comando 'kubectl port-forward' ou 'ssh -L', permite acessar serviços
+remotos através de uma porta local.
+
+O terminal permanece ativo mostrando logs das conexões até que Ctrl+C seja pressionado.`,
+	Example: `  # Encaminha porta local 8080 para porta remota 80
+  sc port-forward webserver 8080:80
+
+  # Encaminha MySQL local 3307 para MySQL remoto 3306
+  sc port-forward db-server 3307:3306
+
+  # Via jump host
+  sc port-forward -j production-jump db-prod 5433:5432
+
+  # Com usuário específico
+  sc port-forward -u deploy app-server 9000:8080`,
+	Args: cobra.ExactArgs(2),
+	Run:  runPortForward,
+}
+
 var cpDownCmd = &cobra.Command{
 	Use:   "down [flags] <host> <caminho_remoto> [destino_local]",
 	Short: "Download de arquivo/diretório remoto",
@@ -278,12 +302,30 @@ PROXY REVERSO
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+PORT FORWARD (Túnel SSH)
+  Encaminha uma porta local para uma porta remota via SSH tunnel.
+  Similar ao 'kubectl port-forward' ou 'ssh -L'.
+
+  Sintaxe: sc port-forward [flags] <host> <local_port:remote_port>
+
+  Exemplos:
+  sc port-forward webserver 8080:80        Acessa porta 80 remota via localhost:8080
+  sc port-forward db-server 3307:3306      Encaminha MySQL
+  sc port-forward -j 1 db-prod 5433:5432   Via jump host
+  sc port-forward -u deploy app 9000:8080  Com usuário específico
+
+  O terminal permanece ativo mostrando logs das conexões.
+  Pressione Ctrl+C para encerrar o túnel.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 COMANDOS ÚTEIS
   sc -s                     Lista servidores e jump hosts cadastrados
   sc -s @tag                Lista servidores filtrados por tag
   sc -v, sc --version       Exibe versão do sshControl
   sc update                 Atualiza para versão mais recente
   sc cp                     Copia arquivos via SFTP (veja sc cp --help)
+  sc port-forward           Encaminha porta local para remota (veja sc port-forward --help)
   sc man                    Exibe este manual
   sc --help                 Exibe ajuda rápida
 
@@ -327,6 +369,7 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(manCmd)
 	rootCmd.AddCommand(cpCmd)
+	rootCmd.AddCommand(pfCmd)
 	cpCmd.AddCommand(cpDownCmd)
 	cpCmd.AddCommand(cpUpCmd)
 
@@ -347,6 +390,11 @@ func init() {
 
 	// Flag específica do upload para múltiplos hosts
 	cpUpCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Envia para múltiplos hosts em paralelo")
+
+	// Flags do comando port-forward
+	pfCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
+	pfCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice)")
+	pfCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
@@ -955,6 +1003,149 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 
 	fmt.Println()
 	fmt.Println("Upload concluído!")
+}
+
+func runPortForward(cobraCmd *cobra.Command, args []string) {
+	hostArg := args[0]
+	portMapping := args[1]
+
+	// Parse do mapeamento de portas (local_port:remote_port)
+	var localPort, remotePort int
+	n, err := fmt.Sscanf(portMapping, "%d:%d", &localPort, &remotePort)
+	if err != nil || n != 2 {
+		fmt.Fprintf(os.Stderr, "Erro: Formato de porta inválido '%s'\n", portMapping)
+		fmt.Fprintf(os.Stderr, "Use o formato: local_port:remote_port (ex: 8080:80)\n")
+		os.Exit(1)
+	}
+
+	if localPort < 1 || localPort > 65535 {
+		fmt.Fprintf(os.Stderr, "Erro: Porta local inválida: %d (deve ser entre 1 e 65535)\n", localPort)
+		os.Exit(1)
+	}
+
+	if remotePort < 1 || remotePort > 65535 {
+		fmt.Fprintf(os.Stderr, "Erro: Porta remota inválida: %d (deve ser entre 1 e 65535)\n", remotePort)
+		os.Exit(1)
+	}
+
+	// Inicializa configuração
+	configPath, err := config.InitializeConfigDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao inicializar configuração: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao carregar %s: %v\n", configPath, err)
+		os.Exit(1)
+	}
+
+	// Resolve o Jump Host se solicitado
+	var selectedJumpHost *config.JumpHost
+	if jumpHost != "" {
+		selectedJumpHost = cfg.ResolveJumpHost(jumpHost)
+		if selectedJumpHost == nil {
+			fmt.Fprintf(os.Stderr, "Erro: Jump host '%s' não encontrado\n", jumpHost)
+			os.Exit(1)
+		}
+	}
+
+	// Valida e aplica o usuário
+	var selectedUser *config.User
+	if username != "" {
+		selectedUser = cfg.FindUser(username)
+		if selectedUser == nil {
+			fmt.Fprintf(os.Stderr, "Erro: Usuário '%s' não encontrado no config.yaml\n", username)
+			os.Exit(1)
+		}
+	}
+
+	effectiveUser := cfg.GetEffectiveUser(selectedUser)
+	if effectiveUser == nil {
+		fmt.Fprintf(os.Stderr, "Erro: Nenhum usuário configurado\n")
+		os.Exit(1)
+	}
+
+	// Resolve o host
+	var hostname string
+	var port int
+	var sshKey string
+
+	usernameToUse := effectiveUser.Name
+	if len(effectiveUser.SSHKeys) > 0 {
+		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	}
+
+	if host := cfg.FindHost(hostArg); host != nil {
+		hostname = host.Host
+		port = host.Port
+	} else {
+		u, h, p, err := cmd.ParseConnectionString(hostArg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+			os.Exit(1)
+		}
+		if u != "" && u != effectiveUser.Name {
+			usernameToUse = u
+			if userFromConfig := cfg.FindUser(usernameToUse); userFromConfig != nil {
+				if len(userFromConfig.SSHKeys) > 0 {
+					sshKey = config.ExpandHomePath(userFromConfig.SSHKeys[0])
+				}
+			} else {
+				sshKey = ""
+			}
+		}
+		hostname = h
+		port = p
+	}
+
+	// Busca a chave SSH do jump host
+	jumpHostSSHKey := ""
+	if selectedJumpHost != nil {
+		jumpHostSSHKey = cfg.GetJumpHostSSHKey(selectedJumpHost)
+	}
+
+	// Solicita senha se -a for especificado
+	password := ""
+	if askPassword {
+		fmt.Printf("Password for %s@%s: ", usernameToUse, hostname)
+		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
+			os.Exit(1)
+		}
+		password = string(passwordBytes)
+	}
+
+	// Cria conexão SSH
+	sshConn := cmd.NewSSHConnection(
+		usernameToUse,
+		hostname,
+		port,
+		sshKey,
+		password,
+		selectedJumpHost,
+		jumpHostSSHKey,
+		"",
+		false,
+		"",
+		0,
+	)
+
+	// Cria sessão de port forward
+	pf := cmd.NewPortForwardSession(sshConn, cmd.PortForward{
+		LocalPort:  localPort,
+		RemoteHost: "127.0.0.1",
+		RemotePort: remotePort,
+	})
+
+	// Inicia o port forwarding (bloqueia até Ctrl+C)
+	if err := pf.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "\nErro: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func main() {
