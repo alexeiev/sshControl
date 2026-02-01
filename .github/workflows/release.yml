@@ -26,6 +26,24 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+      - name: Get tag message
+        id: tag_message
+        run: |
+          # Extrai a mensagem da tag anotada (exclui a primeira linha que é o título)
+          TAG_MESSAGE=$(git tag -l --format='%(contents:body)' ${{ steps.version.outputs.VERSION }})
+
+          # Se não houver body, usa o subject (primeira linha)
+          if [ -z "$TAG_MESSAGE" ]; then
+            TAG_MESSAGE=$(git tag -l --format='%(contents:subject)' ${{ steps.version.outputs.VERSION }})
+          fi
+
+          # Escapa caracteres especiais para o GitHub Actions
+          TAG_MESSAGE="${TAG_MESSAGE//'%'/'%25'}"
+          TAG_MESSAGE="${TAG_MESSAGE//$'\n'/'%0A'}"
+          TAG_MESSAGE="${TAG_MESSAGE//$'\r'/'%0D'}"
+
+          echo "MESSAGE=$TAG_MESSAGE" >> $GITHUB_OUTPUT
+
       - name: Build binaries
         run: |
           # Linux amd64
@@ -55,13 +73,11 @@ jobs:
           sha256sum *.tar.gz > checksums.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.tar.gz
             dist/checksums.txt
-          generate_release_notes: true
+          body: ${{ steps.tag_message.outputs.MESSAGE }}
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
