@@ -429,11 +429,18 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 		return nil
 	}
 
+	// Verifica se o arquivo de chave pública existe antes de tentar ler
+	pubKeyPath := s.SSHKey + ".pub"
+	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
+		// Se a chave pública não existe, retorna silenciosamente (não é erro)
+		return nil
+	}
+
 	// Tenta ler a chave pública
 	pubKey, err := readPublicKey(s.SSHKey)
 	if err != nil {
-		// Se não conseguir ler a chave pública, apenas retorna erro informativo (não bloqueia)
-		return fmt.Errorf("chave pública não disponível: %w", err)
+		// Se não conseguir ler a chave pública, retorna silenciosamente (não é erro crítico)
+		return nil
 	}
 
 	// Cria uma nova sessão para verificar/instalar a chave
