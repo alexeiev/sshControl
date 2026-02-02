@@ -66,7 +66,7 @@ func (pf *PortForwardSession) Start() error {
 	pf.client = client
 
 	// Inicia listener local
-	localAddr := fmt.Sprintf("127.0.0.1:%d", pf.Forward.LocalPort)
+	localAddr := fmt.Sprintf("0.0.0.0:%d", pf.Forward.LocalPort)
 	listener, err := net.Listen("tcp", localAddr)
 	if err != nil {
 		client.Close()
@@ -77,7 +77,7 @@ func (pf *PortForwardSession) Start() error {
 	// Exibe informações do tunnel
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("🚇 Port Forward Ativo\n")
-	fmt.Printf("   Local:  127.0.0.1:%d\n", pf.Forward.LocalPort)
+	fmt.Printf("   Local:  0.0.0.0:%d\n", pf.Forward.LocalPort)
 	fmt.Printf("   Remoto: %s:%d (via %s)\n", pf.Forward.RemoteHost, pf.Forward.RemotePort, pf.SSHConn.Host)
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println()
