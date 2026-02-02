@@ -5,6 +5,16 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.5.1] - 2026-02-02
+
+### Changed
+
+- Port Forward agora faz bind em `0.0.0.0` em vez de `127.0.0.1`, permitindo conexões de outras máquinas na rede
+
+### Fixed
+
+- Correção no campo `dir_cp_default`: agora aplica valor default `~/sshControl` automaticamente quando o campo está vazio no config.yaml existente
+
 ## [0.5.0] - 2026-02-01
 
 ### Added
@@ -175,7 +185,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/alexeiev/sshControl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/alexeiev/sshControl/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/alexeiev/sshControl/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/alexeiev/sshControl/compare/v0.4.0...v0.4.1

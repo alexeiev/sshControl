@@ -59,6 +59,9 @@ func LoadConfig(filename string) (*ConfigFile, error) {
 		return nil, fmt.Errorf("erro ao parsear YAML: %w", err)
 	}
 
+	// Aplica valores default para campos não definidos
+	cfg.applyDefaults()
+
 	// Valida pares de chaves SSH para todos os usuários
 	for i := range cfg.Config.User {
 		warnings := ValidateSSHKeyPairs(&cfg.Config.User[i])
@@ -68,6 +71,14 @@ func LoadConfig(filename string) (*ConfigFile, error) {
 	}
 
 	return &cfg, nil
+}
+
+// applyDefaults aplica valores padrão para campos não definidos na configuração
+func (c *ConfigFile) applyDefaults() {
+	// Define valor padrão para dir_cp_default se não estiver configurado
+	if c.Config.DirCpDefault == "" {
+		c.Config.DirCpDefault = "~/sshControl"
+	}
 }
 
 // FindUser procura um usuário pelo nome
