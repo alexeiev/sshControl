@@ -482,11 +482,11 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 
 	var hostname string
 	var port int
-	var sshKey string
+	var sshKeys []string
 
 	username := effectiveUser.Name
-	if len(effectiveUser.SSHKeys) > 0 {
-		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	for _, key := range effectiveUser.SSHKeys {
+		sshKeys = append(sshKeys, config.ExpandHomePath(key))
 	}
 
 	// Primeiro tenta encontrar no config.yaml
@@ -507,11 +507,12 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 		if host.parsedUser != "" && host.parsedUser != effectiveUser.Name {
 			username = host.parsedUser
 			if userFromConfig := cfg.FindUser(username); userFromConfig != nil {
-				if len(userFromConfig.SSHKeys) > 0 {
-					sshKey = config.ExpandHomePath(userFromConfig.SSHKeys[0])
+				sshKeys = nil // Limpa chaves anteriores
+				for _, key := range userFromConfig.SSHKeys {
+					sshKeys = append(sshKeys, config.ExpandHomePath(key))
 				}
 			} else {
-				sshKey = ""
+				sshKeys = nil
 			}
 		}
 
@@ -519,10 +520,10 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 		port = host.port
 	}
 
-	// Busca a chave SSH do jump host
-	jumpHostSSHKey := ""
+	// Busca as chaves SSH do jump host
+	var jumpHostSSHKeys []string
 	if jumpHost != nil {
-		jumpHostSSHKey = cfg.GetJumpHostSSHKey(jumpHost)
+		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(jumpHost)
 	}
 
 	// Cria a conexão SSH
@@ -530,10 +531,10 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 		username,
 		hostname,
 		port,
-		sshKey,
+		sshKeys,
 		password,
 		jumpHost,
-		jumpHostSSHKey,
+		jumpHostSSHKeys,
 		"",    // sem comando
 		false, // sem proxy
 		"",

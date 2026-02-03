@@ -16,17 +16,17 @@ import (
 
 // SSHConnection representa os parâmetros de uma conexão SSH
 type SSHConnection struct {
-	User                      string
-	Host                      string
-	Port                      int
-	SSHKey                    string
-	Password                  string // Senha pré-fornecida (opcional)
-	JumpHost                  *config.JumpHost
-	JumpHostSSHKey            string
-	Command                   string
-	ProxyEnabled              bool
-	ProxyAddress              string
-	ProxyPort                 int
+	User                       string
+	Host                       string
+	Port                       int
+	SSHKeys                    []string // Múltiplas chaves SSH para tentar autenticação
+	Password                   string   // Senha pré-fornecida (opcional)
+	JumpHost                   *config.JumpHost
+	JumpHostSSHKeys            []string // Múltiplas chaves SSH para o jump host
+	Command                    string
+	ProxyEnabled               bool
+	ProxyAddress               string
+	ProxyPort                  int
 	InteractivePasswordAllowed bool // Se false, não pede senha interativamente (para modo múltiplos hosts)
 }
 
@@ -139,18 +139,27 @@ func (s *SSHConnection) createSSHConfig() (*ssh.ClientConfig, error) {
 }
 
 // createAuthMethods cria os métodos de autenticação para SSH
-func (s *SSHConnection) createAuthMethods(sshKeyPath string, context string) []ssh.AuthMethod {
+func (s *SSHConnection) createAuthMethods(sshKeyPaths []string, context string) []ssh.AuthMethod {
 	authMethods := []ssh.AuthMethod{}
 
-	// Adiciona autenticação por chave SSH se especificada
-	if sshKeyPath != "" {
-		key, err := os.ReadFile(sshKeyPath)
-		if err == nil {
-			signer, err := ssh.ParsePrivateKey(key)
-			if err == nil {
-				authMethods = append(authMethods, ssh.PublicKeys(signer))
-			}
+	// Adiciona autenticação por chaves SSH (tenta todas as chaves configuradas)
+	var signers []ssh.Signer
+	for _, sshKeyPath := range sshKeyPaths {
+		if sshKeyPath == "" {
+			continue
 		}
+		key, err := os.ReadFile(sshKeyPath)
+		if err != nil {
+			continue
+		}
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			continue
+		}
+		signers = append(signers, signer)
+	}
+	if len(signers) > 0 {
+		authMethods = append(authMethods, ssh.PublicKeys(signers...))
 	}
 
 	// Adiciona autenticação via SSH Agent se disponível
@@ -181,7 +190,7 @@ func (s *SSHConnection) createAuthMethods(sshKeyPath string, context string) []s
 
 // createSSHConfigWithContext cria a configuração do cliente SSH com contexto para prompts
 func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientConfig, error) {
-	authMethods := s.createAuthMethods(s.SSHKey, context)
+	authMethods := s.createAuthMethods(s.SSHKeys, context)
 
 	config := &ssh.ClientConfig{
 		User:            s.User,
@@ -202,7 +211,7 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 	}
 
 	// Cria métodos de autenticação específicos para o Jump Host
-	jumpAuthMethods := s.createAuthMethods(s.JumpHostSSHKey, fmt.Sprintf("%s@%s (Jump Host)", s.JumpHost.User, s.JumpHost.Host))
+	jumpAuthMethods := s.createAuthMethods(s.JumpHostSSHKeys, fmt.Sprintf("%s@%s (Jump Host)", s.JumpHost.User, s.JumpHost.Host))
 
 	// Cria configuração separada para Jump Host
 	jumpConfig := &ssh.ClientConfig{
@@ -384,8 +393,12 @@ func (s *SSHConnection) formatConnectionString() string {
 		conn += fmt.Sprintf(":%d", s.Port)
 	}
 
-	if s.SSHKey != "" {
-		conn += fmt.Sprintf(" (key: %s)", s.SSHKey)
+	if len(s.SSHKeys) > 0 {
+		if len(s.SSHKeys) == 1 {
+			conn += fmt.Sprintf(" (key: %s)", s.SSHKeys[0])
+		} else {
+			conn += fmt.Sprintf(" (keys: %d configured)", len(s.SSHKeys))
+		}
 	}
 
 	if s.JumpHost != nil {
@@ -425,19 +438,22 @@ func readPublicKey(privateKeyPath string) (string, error) {
 // installPublicKeyIfNeeded instala a chave pública no servidor remoto se ainda não estiver presente
 func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 	// Se não há chave SSH configurada, não faz nada
-	if s.SSHKey == "" {
+	if len(s.SSHKeys) == 0 {
 		return nil
 	}
 
+	// Usa a primeira chave configurada para instalação
+	sshKey := s.SSHKeys[0]
+
 	// Verifica se o arquivo de chave pública existe antes de tentar ler
-	pubKeyPath := s.SSHKey + ".pub"
+	pubKeyPath := sshKey + ".pub"
 	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
 		// Se a chave pública não existe, retorna silenciosamente (não é erro)
 		return nil
 	}
 
 	// Tenta ler a chave pública
-	pubKey, err := readPublicKey(s.SSHKey)
+	pubKey, err := readPublicKey(sshKey)
 	if err != nil {
 		// Se não conseguir ler a chave pública, retorna silenciosamente (não é erro crítico)
 		return nil
@@ -489,15 +505,15 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 }
 
 // NewSSHConnection cria uma nova conexão SSH
-func NewSSHConnection(user, host string, port int, sshKey, password string, jumpHost *config.JumpHost, jumpHostSSHKey string, command string, proxyEnabled bool, proxyAddress string, proxyPort int) *SSHConnection {
+func NewSSHConnection(user, host string, port int, sshKeys []string, password string, jumpHost *config.JumpHost, jumpHostSSHKeys []string, command string, proxyEnabled bool, proxyAddress string, proxyPort int) *SSHConnection {
 	return &SSHConnection{
 		User:                       user,
 		Host:                       host,
 		Port:                       port,
-		SSHKey:                     sshKey,
+		SSHKeys:                    sshKeys,
 		Password:                   password,
 		JumpHost:                   jumpHost,
-		JumpHostSSHKey:             jumpHostSSHKey,
+		JumpHostSSHKeys:            jumpHostSSHKeys,
 		Command:                    command,
 		ProxyEnabled:               proxyEnabled,
 		ProxyAddress:               proxyAddress,
