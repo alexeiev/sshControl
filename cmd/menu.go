@@ -113,6 +113,9 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 		return
 	}
 
+	// Valida chaves SSH apenas do usuário efetivo
+	config.ValidateEffectiveUserSSHKeys(effectiveUser)
+
 	// Obtém as chaves SSH do usuário efetivo
 	var sshKeys []string
 	for _, key := range effectiveUser.SSHKeys {

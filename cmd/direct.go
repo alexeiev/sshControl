@@ -32,6 +32,9 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 		os.Exit(1)
 	}
 
+	// Valida chaves SSH apenas do usuário efetivo
+	config.ValidateEffectiveUserSSHKeys(effectiveUser)
+
 	username := effectiveUser.Name
 	for _, key := range effectiveUser.SSHKeys {
 		sshKeys = append(sshKeys, config.ExpandHomePath(key))
