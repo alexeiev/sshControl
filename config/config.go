@@ -62,15 +62,22 @@ func LoadConfig(filename string) (*ConfigFile, error) {
 	// Aplica valores default para campos não definidos
 	cfg.applyDefaults()
 
-	// Valida pares de chaves SSH para todos os usuários
-	for i := range cfg.Config.User {
-		warnings := ValidateSSHKeyPairs(&cfg.Config.User[i])
-		for _, warning := range warnings {
-			fmt.Fprintf(os.Stderr, "⚠️  Aviso: %s\n", warning)
-		}
-	}
+	// NOTA: A validação de chaves SSH agora é feita apenas para o usuário efetivo
+	// através da função ValidateEffectiveUserSSHKeys, chamada após determinar o usuário
 
 	return &cfg, nil
+}
+
+// ValidateEffectiveUserSSHKeys valida as chaves SSH apenas do usuário efetivo
+// Deve ser chamada após determinar qual usuário será usado na conexão
+func ValidateEffectiveUserSSHKeys(user *User) {
+	if user == nil {
+		return
+	}
+	warnings := ValidateSSHKeyPairs(user)
+	for _, warning := range warnings {
+		fmt.Fprintf(os.Stderr, "⚠️  Aviso: %s\n", warning)
+	}
 }
 
 // applyDefaults aplica valores padrão para campos não definidos na configuração
@@ -143,6 +150,7 @@ func (c *ConfigFile) GetEffectiveUser(selectedUser *User) *User {
 }
 
 // GetSSHKey retorna a primeira chave SSH disponível para o usuário
+// Deprecated: Use GetSSHKeys para obter todas as chaves
 func (c *ConfigFile) GetSSHKey(username string) string {
 	for _, user := range c.Config.User {
 		if user.Name == username && len(user.SSHKeys) > 0 {
@@ -150,6 +158,20 @@ func (c *ConfigFile) GetSSHKey(username string) string {
 		}
 	}
 	return ""
+}
+
+// GetSSHKeys retorna todas as chaves SSH disponíveis para o usuário
+func (c *ConfigFile) GetSSHKeys(username string) []string {
+	for _, user := range c.Config.User {
+		if user.Name == username && len(user.SSHKeys) > 0 {
+			keys := make([]string, len(user.SSHKeys))
+			for i, key := range user.SSHKeys {
+				keys[i] = ExpandHomePath(key)
+			}
+			return keys
+		}
+	}
+	return nil
 }
 
 // FindHost procura um host pelo nome
@@ -291,6 +313,7 @@ func (c *ConfigFile) ResolveJumpHost(identifier string) *JumpHost {
 }
 
 // GetJumpHostSSHKey retorna a chave SSH do usuário configurado no jump host
+// Deprecated: Use GetJumpHostSSHKeys para obter todas as chaves
 func (c *ConfigFile) GetJumpHostSSHKey(jumpHost *JumpHost) string {
 	if jumpHost == nil {
 		return ""
@@ -303,6 +326,25 @@ func (c *ConfigFile) GetJumpHostSSHKey(jumpHost *JumpHost) string {
 	}
 
 	return ExpandHomePath(user.SSHKeys[0])
+}
+
+// GetJumpHostSSHKeys retorna todas as chaves SSH do usuário configurado no jump host
+func (c *ConfigFile) GetJumpHostSSHKeys(jumpHost *JumpHost) []string {
+	if jumpHost == nil {
+		return nil
+	}
+
+	// Busca o usuário do jump host no config
+	user := c.FindUser(jumpHost.User)
+	if user == nil || len(user.SSHKeys) == 0 {
+		return nil
+	}
+
+	keys := make([]string, len(user.SSHKeys))
+	for i, key := range user.SSHKeys {
+		keys[i] = ExpandHomePath(key)
+	}
+	return keys
 }
 
 // FormatConnection formata a string de conexão SSH

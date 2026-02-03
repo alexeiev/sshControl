@@ -22,7 +22,7 @@ import (
 func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
 	var hostname string
 	var port int
-	var sshKey string
+	var sshKeys []string
 	var shouldAutoCreate bool // Flag para indicar se deve criar o host automaticamente
 
 	// Determina o usuário efetivo (flag -u tem precedência sobre default_user)
@@ -32,9 +32,12 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 		os.Exit(1)
 	}
 
+	// Valida chaves SSH apenas do usuário efetivo
+	config.ValidateEffectiveUserSSHKeys(effectiveUser)
+
 	username := effectiveUser.Name
-	if len(effectiveUser.SSHKeys) > 0 {
-		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	for _, key := range effectiveUser.SSHKeys {
+		sshKeys = append(sshKeys, config.ExpandHomePath(key))
 	}
 
 	// Primeiro tenta encontrar no config.yaml
@@ -53,14 +56,15 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 		// Se a string incluir um usuário explícito (user@host), usa ele
 		if host.parsedUser != "" && host.parsedUser != effectiveUser.Name {
 			username = host.parsedUser
-			// Tenta obter a chave SSH desse usuário específico
+			// Tenta obter as chaves SSH desse usuário específico
 			if userFromConfig := cfg.FindUser(username); userFromConfig != nil {
-				if len(userFromConfig.SSHKeys) > 0 {
-					sshKey = config.ExpandHomePath(userFromConfig.SSHKeys[0])
+				sshKeys = nil // Limpa chaves anteriores
+				for _, key := range userFromConfig.SSHKeys {
+					sshKeys = append(sshKeys, config.ExpandHomePath(key))
 				}
 			} else {
 				// Usuário não está no config, não usa chave SSH
-				sshKey = ""
+				sshKeys = nil
 			}
 		}
 
@@ -73,10 +77,10 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 		}
 	}
 
-	// Busca a chave SSH do jump host se estiver usando jump host
-	jumpHostSSHKey := ""
+	// Busca as chaves SSH do jump host se estiver usando jump host
+	var jumpHostSSHKeys []string
 	if jumpHost != nil {
-		jumpHostSSHKey = cfg.GetJumpHostSSHKey(jumpHost)
+		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(jumpHost)
 	}
 
 	// Obtém configuração de proxy
@@ -105,10 +109,10 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 		username,
 		hostname,
 		port,
-		sshKey,
+		sshKeys,
 		password, // Senha (vazia se -a não for especificado, ou fornecida pelo usuário)
 		jumpHost,
-		jumpHostSSHKey,
+		jumpHostSSHKeys,
 		command,
 		proxyActive,
 		proxyAddress,

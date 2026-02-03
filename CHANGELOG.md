@@ -5,6 +5,14 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.5.2] - 2026-02-03
+
+### Fixed
+
+- **Suporte a múltiplas chaves SSH**: Corrigido bug onde apenas a primeira chave SSH da lista `ssh_keys` era utilizada para autenticação. Agora todas as chaves configuradas para o usuário são tentadas em sequência até encontrar uma válida
+- **Validação de chaves SSH otimizada**: A validação de existência de chaves públicas (`.pub`) agora é executada apenas para o usuário efetivo da conexão, não para todos os usuários do config.yaml
+
+
 ## [0.5.1] - 2026-02-02
 
 ### Changed
@@ -185,7 +193,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/alexeiev/sshControl/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/alexeiev/sshControl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/alexeiev/sshControl/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/alexeiev/sshControl/compare/v0.4.1...v0.4.2
