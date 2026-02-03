@@ -62,15 +62,22 @@ func LoadConfig(filename string) (*ConfigFile, error) {
 	// Aplica valores default para campos não definidos
 	cfg.applyDefaults()
 
-	// Valida pares de chaves SSH para todos os usuários
-	for i := range cfg.Config.User {
-		warnings := ValidateSSHKeyPairs(&cfg.Config.User[i])
-		for _, warning := range warnings {
-			fmt.Fprintf(os.Stderr, "⚠️  Aviso: %s\n", warning)
-		}
-	}
+	// NOTA: A validação de chaves SSH agora é feita apenas para o usuário efetivo
+	// através da função ValidateEffectiveUserSSHKeys, chamada após determinar o usuário
 
 	return &cfg, nil
+}
+
+// ValidateEffectiveUserSSHKeys valida as chaves SSH apenas do usuário efetivo
+// Deve ser chamada após determinar qual usuário será usado na conexão
+func ValidateEffectiveUserSSHKeys(user *User) {
+	if user == nil {
+		return
+	}
+	warnings := ValidateSSHKeyPairs(user)
+	for _, warning := range warnings {
+		fmt.Fprintf(os.Stderr, "⚠️  Aviso: %s\n", warning)
+	}
 }
 
 // applyDefaults aplica valores padrão para campos não definidos na configuração

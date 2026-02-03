@@ -69,6 +69,9 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 		os.Exit(1)
 	}
 
+	// Valida chaves SSH apenas do usuário efetivo
+	config.ValidateEffectiveUserSSHKeys(effectiveUser)
+
 	// Expande tags para hosts
 	expandedHosts, tagsFound := expandTagsToHosts(cfg, hostArgs)
 	if len(expandedHosts) == 0 {

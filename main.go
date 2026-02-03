@@ -695,6 +695,9 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// Valida chaves SSH apenas do usuário efetivo
+	config.ValidateEffectiveUserSSHKeys(effectiveUser)
+
 	// Resolve o host
 	var hostname string
 	var port int
@@ -884,6 +887,9 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// Valida chaves SSH apenas do usuário efetivo
+	config.ValidateEffectiveUserSSHKeys(effectiveUser)
+
 	// Cria transferência
 	ft := &cmd.FileTransfer{
 		LocalPath:  localPath,
@@ -1068,6 +1074,9 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 		fmt.Fprintf(os.Stderr, "Erro: Nenhum usuário configurado\n")
 		os.Exit(1)
 	}
+
+	// Valida chaves SSH apenas do usuário efetivo
+	config.ValidateEffectiveUserSSHKeys(effectiveUser)
 
 	// Resolve o host
 	var hostname string
