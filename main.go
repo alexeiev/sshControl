@@ -698,11 +698,11 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 	// Resolve o host
 	var hostname string
 	var port int
-	var sshKey string
+	var sshKeys []string
 
 	usernameToUse := effectiveUser.Name
-	if len(effectiveUser.SSHKeys) > 0 {
-		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	for _, key := range effectiveUser.SSHKeys {
+		sshKeys = append(sshKeys, config.ExpandHomePath(key))
 	}
 
 	if host := cfg.FindHost(hostArg); host != nil {
@@ -717,21 +717,22 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		if u != "" && u != effectiveUser.Name {
 			usernameToUse = u
 			if userFromConfig := cfg.FindUser(usernameToUse); userFromConfig != nil {
-				if len(userFromConfig.SSHKeys) > 0 {
-					sshKey = config.ExpandHomePath(userFromConfig.SSHKeys[0])
+				sshKeys = nil // Limpa chaves anteriores
+				for _, key := range userFromConfig.SSHKeys {
+					sshKeys = append(sshKeys, config.ExpandHomePath(key))
 				}
 			} else {
-				sshKey = ""
+				sshKeys = nil
 			}
 		}
 		hostname = h
 		port = p
 	}
 
-	// Busca a chave SSH do jump host
-	jumpHostSSHKey := ""
+	// Busca as chaves SSH do jump host
+	var jumpHostSSHKeys []string
 	if selectedJumpHost != nil {
-		jumpHostSSHKey = cfg.GetJumpHostSSHKey(selectedJumpHost)
+		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(selectedJumpHost)
 	}
 
 	// Solicita senha se -a for especificado
@@ -752,10 +753,10 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		usernameToUse,
 		hostname,
 		port,
-		sshKey,
+		sshKeys,
 		password,
 		selectedJumpHost,
-		jumpHostSSHKey,
+		jumpHostSSHKeys,
 		"",
 		false,
 		"",
@@ -925,11 +926,11 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 
 	var hostname string
 	var port int
-	var sshKey string
+	var sshKeys []string
 
 	usernameToUse := effectiveUser.Name
-	if len(effectiveUser.SSHKeys) > 0 {
-		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	for _, key := range effectiveUser.SSHKeys {
+		sshKeys = append(sshKeys, config.ExpandHomePath(key))
 	}
 
 	if host := cfg.FindHost(hostArg); host != nil {
@@ -944,21 +945,22 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		if u != "" && u != effectiveUser.Name {
 			usernameToUse = u
 			if userFromConfig := cfg.FindUser(usernameToUse); userFromConfig != nil {
-				if len(userFromConfig.SSHKeys) > 0 {
-					sshKey = config.ExpandHomePath(userFromConfig.SSHKeys[0])
+				sshKeys = nil // Limpa chaves anteriores
+				for _, key := range userFromConfig.SSHKeys {
+					sshKeys = append(sshKeys, config.ExpandHomePath(key))
 				}
 			} else {
-				sshKey = ""
+				sshKeys = nil
 			}
 		}
 		hostname = h
 		port = p
 	}
 
-	// Busca a chave SSH do jump host
-	jumpHostSSHKey := ""
+	// Busca as chaves SSH do jump host
+	var jumpHostSSHKeys []string
 	if selectedJumpHost != nil {
-		jumpHostSSHKey = cfg.GetJumpHostSSHKey(selectedJumpHost)
+		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(selectedJumpHost)
 	}
 
 	// Solicita senha se -a for especificado
@@ -979,10 +981,10 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		usernameToUse,
 		hostname,
 		port,
-		sshKey,
+		sshKeys,
 		password,
 		selectedJumpHost,
-		jumpHostSSHKey,
+		jumpHostSSHKeys,
 		"",
 		false,
 		"",
@@ -1070,11 +1072,11 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 	// Resolve o host
 	var hostname string
 	var port int
-	var sshKey string
+	var sshKeys []string
 
 	usernameToUse := effectiveUser.Name
-	if len(effectiveUser.SSHKeys) > 0 {
-		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	for _, key := range effectiveUser.SSHKeys {
+		sshKeys = append(sshKeys, config.ExpandHomePath(key))
 	}
 
 	if host := cfg.FindHost(hostArg); host != nil {
@@ -1089,21 +1091,22 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 		if u != "" && u != effectiveUser.Name {
 			usernameToUse = u
 			if userFromConfig := cfg.FindUser(usernameToUse); userFromConfig != nil {
-				if len(userFromConfig.SSHKeys) > 0 {
-					sshKey = config.ExpandHomePath(userFromConfig.SSHKeys[0])
+				sshKeys = nil // Limpa chaves anteriores
+				for _, key := range userFromConfig.SSHKeys {
+					sshKeys = append(sshKeys, config.ExpandHomePath(key))
 				}
 			} else {
-				sshKey = ""
+				sshKeys = nil
 			}
 		}
 		hostname = h
 		port = p
 	}
 
-	// Busca a chave SSH do jump host
-	jumpHostSSHKey := ""
+	// Busca as chaves SSH do jump host
+	var jumpHostSSHKeys []string
 	if selectedJumpHost != nil {
-		jumpHostSSHKey = cfg.GetJumpHostSSHKey(selectedJumpHost)
+		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(selectedJumpHost)
 	}
 
 	// Solicita senha se -a for especificado
@@ -1124,10 +1127,10 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 		usernameToUse,
 		hostname,
 		port,
-		sshKey,
+		sshKeys,
 		password,
 		selectedJumpHost,
-		jumpHostSSHKey,
+		jumpHostSSHKeys,
 		"",
 		false,
 		"",

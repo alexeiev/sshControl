@@ -163,12 +163,12 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, askPassword bool) HostResult {
 	var hostname string
 	var port int
-	var sshKey string
+	var sshKeys []string
 	var shouldAutoCreate bool
 
 	username := effectiveUser.Name
-	if len(effectiveUser.SSHKeys) > 0 {
-		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	for _, key := range effectiveUser.SSHKeys {
+		sshKeys = append(sshKeys, config.ExpandHomePath(key))
 	}
 
 	// Primeiro tenta encontrar no config.yaml
@@ -189,13 +189,14 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		// Se a string incluir um usuário explícito (user@host), usa ele
 		if host.parsedUser != "" && host.parsedUser != effectiveUser.Name {
 			username = host.parsedUser
-			// Tenta obter a chave SSH desse usuário específico
+			// Tenta obter as chaves SSH desse usuário específico
 			if userFromConfig := cfg.FindUser(username); userFromConfig != nil {
-				if len(userFromConfig.SSHKeys) > 0 {
-					sshKey = config.ExpandHomePath(userFromConfig.SSHKeys[0])
+				sshKeys = nil // Limpa chaves anteriores
+				for _, key := range userFromConfig.SSHKeys {
+					sshKeys = append(sshKeys, config.ExpandHomePath(key))
 				}
 			} else {
-				sshKey = ""
+				sshKeys = nil
 			}
 		}
 
@@ -208,10 +209,10 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		}
 	}
 
-	// Busca a chave SSH do jump host se estiver usando jump host
-	jumpHostSSHKey := ""
+	// Busca as chaves SSH do jump host se estiver usando jump host
+	var jumpHostSSHKeys []string
 	if jumpHost != nil {
-		jumpHostSSHKey = cfg.GetJumpHostSSHKey(jumpHost)
+		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(jumpHost)
 	}
 
 	// Cria a conexão SSH
@@ -219,10 +220,10 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		username,
 		hostname,
 		port,
-		sshKey,
+		sshKeys,
 		password, // Senha pré-fornecida ou vazia
 		jumpHost,
-		jumpHostSSHKey,
+		jumpHostSSHKeys,
 		command,
 		proxyEnabled,
 		proxyAddress,
@@ -239,9 +240,9 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		errorMsg := err.Error()
 
 		// Se falhou por autenticação e não foi pedida senha (-a), sugere usar a flag
-		if !askPassword && password == "" && sshKey == "" {
+		if !askPassword && password == "" && len(sshKeys) == 0 {
 			errorMsg += " (DICA: Use a opção -a ou --ask-password para fornecer senha)"
-		} else if !askPassword && password == "" && sshKey != "" {
+		} else if !askPassword && password == "" && len(sshKeys) > 0 {
 			// Tem chave configurada mas pode não estar instalada
 			errorMsg += " (DICA: Se a chave SSH não estiver instalada, use -a para fornecer senha)"
 		}

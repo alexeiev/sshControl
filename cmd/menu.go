@@ -51,7 +51,7 @@ var (
 // hostItem implementa list.Item para trabalhar com bubbles/list
 type hostItem struct {
 	host          config.Host
-	sshKey        string
+	sshKeys       []string
 	effectiveUser string
 }
 
@@ -78,19 +78,19 @@ func (i hostItem) Description() string {
 
 // model representa o estado da aplicação
 type model struct {
-	list           list.Model
-	filter         textinput.Model
-	filterActive   bool
-	cfg            *config.ConfigFile
-	selectedUser   *config.User
-	jumpHost       *config.JumpHost
-	allItems       []list.Item
-	selectedHost   *config.Host
-	selectedSSHKey string
-	effectiveUser  string
-	version        string
-	quitting       bool
-	proxyEnabled   bool
+	list            list.Model
+	filter          textinput.Model
+	filterActive    bool
+	cfg             *config.ConfigFile
+	selectedUser    *config.User
+	jumpHost        *config.JumpHost
+	allItems        []list.Item
+	selectedHost    *config.Host
+	selectedSSHKeys []string
+	effectiveUser   string
+	version         string
+	quitting        bool
+	proxyEnabled    bool
 }
 
 // ShowInteractive exibe o menu interativo usando bubbletea
@@ -113,16 +113,16 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 		return
 	}
 
-	// Obtém a chave SSH do usuário efetivo
-	sshKey := ""
-	if len(effectiveUser.SSHKeys) > 0 {
-		sshKey = config.ExpandHomePath(effectiveUser.SSHKeys[0])
+	// Obtém as chaves SSH do usuário efetivo
+	var sshKeys []string
+	for _, key := range effectiveUser.SSHKeys {
+		sshKeys = append(sshKeys, config.ExpandHomePath(key))
 	}
 
 	for i, h := range tuiHosts {
 		items[i] = hostItem{
 			host:          h,
-			sshKey:        sshKey,
+			sshKeys:       sshKeys,
 			effectiveUser: effectiveUser.Name,
 		}
 	}
@@ -159,10 +159,10 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 
 	// Conecta ao host selecionado
 	if m, ok := finalModel.(model); ok && m.selectedHost != nil {
-		// Busca a chave SSH do jump host se estiver usando jump host
-		jumpHostSSHKey := ""
+		// Busca as chaves SSH do jump host se estiver usando jump host
+		var jumpHostSSHKeys []string
 		if m.jumpHost != nil {
-			jumpHostSSHKey = m.cfg.GetJumpHostSSHKey(m.jumpHost)
+			jumpHostSSHKeys = m.cfg.GetJumpHostSSHKeys(m.jumpHost)
 		}
 
 		// Obtém configuração de proxy
@@ -177,10 +177,10 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 			m.effectiveUser,
 			m.selectedHost.Host,
 			m.selectedHost.Port,
-			m.selectedSSHKey,
+			m.selectedSSHKeys,
 			"", // Senha vazia - será pedida interativamente se necessário
 			m.jumpHost,
-			jumpHostSSHKey,
+			jumpHostSSHKeys,
 			"", // Modo interativo não executa comandos remotos
 			proxyActive,
 			proxyAddress,
@@ -234,7 +234,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if i, ok := m.list.SelectedItem().(hostItem); ok {
 				m.selectedHost = &i.host
-				m.selectedSSHKey = i.sshKey
+				m.selectedSSHKeys = i.sshKeys
 				m.effectiveUser = i.effectiveUser
 				return m, tea.Quit
 			}
