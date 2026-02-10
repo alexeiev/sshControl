@@ -22,6 +22,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 📝 **Auto-Criação de Hosts**: Salva automaticamente hosts não cadastrados no config.yaml
 - 📁 **Cópia de Arquivos**: Transferência de arquivos via SFTP com suporte a múltiplos hosts
 - 🚇 **Port Forward**: Encaminhe portas locais para remotas via túnel SSH (similar ao kubectl port-forward)
+- 🔍 **Modo Debug**: Flag `-v` para exibir informações detalhadas da conexão e facilitar diagnósticos
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
 
 ## Instalação
@@ -268,6 +269,46 @@ sc cp up -l @web ./deploy.sh /opt/
 - `-j, --jump <jump>`: Usa jump host
 - `-u, --user <user>`: Usa usuário específico
 - `-a, --ask-password`: Solicita senha antes
+- `-v, --verbose`: Modo debug (informações detalhadas da conexão)
+
+### Modo Debug (Verbose)
+
+Use a flag `-v` para exibir informações detalhadas da conexão, útil para diagnosticar problemas de autenticação, rede ou configuração:
+
+```bash
+# Conexão direta com debug
+sc -v webserver
+
+# Comando remoto com debug
+sc -v -c "uptime" webserver
+
+# Com jump host
+sc -v -j 1 webserver
+
+# Múltiplos hosts
+sc -v -c "uptime" -l @web
+
+# SFTP com debug
+sc cp down -v webserver /var/log/app.log ./
+
+# Port forward com debug
+sc port-forward -v webserver 8080:80
+```
+
+**Exemplo de saída**:
+```
+[DEBUG] Usuário: ubuntu
+[DEBUG] Host: 192.168.1.50:22
+[DEBUG] Chave SSH: ~/.ssh/id_rsa ... OK
+[DEBUG] Chave SSH: ~/.ssh/id_ed25519 ... falha ao ler arquivo
+[DEBUG] SSH Agent: disponível
+[DEBUG] Métodos de autenticação: [publickey (1 chave(s)), agent, password (interativa)]
+[DEBUG] Conectando diretamente a 192.168.1.50:22...
+[DEBUG] Conexão direta estabelecida
+[DEBUG] Conexão SSH estabelecida com sucesso
+[DEBUG] Solicitando PTY (xterm-256color, 120x40)
+[DEBUG] Iniciando sessão interativa...
+```
 
 ### Comandos Úteis
 
@@ -280,6 +321,7 @@ sc -s @ansible
 sc -s @production
 
 # Verificar versão
+sc -V
 sc --version
 
 # Atualizar para versão mais recente
@@ -605,7 +647,7 @@ sc port-forward -a webserver 8080:80
 
 - **Logs em tempo real**: Mostra cada conexão com origem, bytes transferidos e duração
 - **Estatísticas da sessão**: Ao encerrar (Ctrl+C), exibe total de conexões e bytes
-- **Suporte completo**: Jump hosts (`-j`), usuário específico (`-u`), senha (`-a`)
+- **Suporte completo**: Jump hosts (`-j`), usuário específico (`-u`), senha (`-a`), debug (`-v`)
 
 **Exemplo de saída**:
 

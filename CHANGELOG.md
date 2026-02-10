@@ -5,6 +5,22 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.6.0] - 2026-02-10
+
+### Added
+
+- **Modo Debug/Verbose (`-v, --verbose`)**: Nova flag para exibir informações detalhadas durante a conexão SSH, facilitando diagnósticos de problemas
+  - Exibe métodos de autenticação disponíveis (chaves SSH, SSH Agent, senha)
+  - Mostra status de cada chave SSH (sucesso/falha ao carregar)
+  - Detalha o fluxo de conexão (direta ou via jump host com tunnel)
+  - Informa configuração de PTY, proxy reverso e instalação de chaves públicas
+  - Disponível em todos os modos: interativo, direto, múltiplos hosts, SFTP e port forward
+  - Mensagens com prefixo `[DEBUG]` enviadas para stderr (não interfere no output normal)
+
+### Changed
+
+- **Flag de versão alterada de `-v` para `-V`**: A flag curta para exibir a versão foi movida para `-V` (`--version` permanece inalterado), liberando `-v` para o modo verbose/debug
+
 ## [0.5.2] - 2026-02-03
 
 ### Fixed
@@ -193,7 +209,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/alexeiev/sshControl/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/alexeiev/sshControl/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/alexeiev/sshControl/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/alexeiev/sshControl/compare/v0.4.2...v0.5.0
