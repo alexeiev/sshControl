@@ -19,7 +19,7 @@ import (
 // 3. user@host: "ubuntu@192.168.1.50" (porta 22 por padrão)
 // 4. host:port: "192.168.1.50:22" (usa usuário especificado ou default)
 // 5. host: "192.168.1.50" (usa usuário especificado ou default e porta 22)
-func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
+func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, verbose bool) {
 	var hostname string
 	var port int
 	var sshKeys []string
@@ -117,6 +117,7 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 		proxyActive,
 		proxyAddress,
 		proxyPort,
+		verbose,
 	)
 
 	// Decide se executa comando remoto ou inicia sessão interativa

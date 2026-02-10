@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/alexeiev/sshControl/config"
@@ -28,6 +29,14 @@ type SSHConnection struct {
 	ProxyAddress               string
 	ProxyPort                  int
 	InteractivePasswordAllowed bool // Se false, não pede senha interativamente (para modo múltiplos hosts)
+	Verbose                    bool // Modo debug: exibe informações detalhadas da conexão
+}
+
+// debugLog imprime mensagens de debug quando o modo verbose está ativo
+func (s *SSHConnection) debugLog(format string, args ...interface{}) {
+	if s.Verbose {
+		fmt.Fprintf(os.Stderr, "[DEBUG] "+format+"\n", args...)
+	}
 }
 
 // Connect estabelece uma conexão SSH interativa
@@ -38,7 +47,18 @@ func (s *SSHConnection) Connect() error {
 	fmt.Printf("   %s\n", s.formatConnectionString())
 	fmt.Println()
 
+	s.debugLog("Iniciando conexão interativa")
+	s.debugLog("Usuário: %s", s.User)
+	s.debugLog("Host: %s:%d", s.Host, s.Port)
+	if s.JumpHost != nil {
+		s.debugLog("Jump Host: %s (%s@%s:%d)", s.JumpHost.Name, s.JumpHost.User, s.JumpHost.Host, s.JumpHost.Port)
+	}
+	if s.ProxyEnabled {
+		s.debugLog("Proxy habilitado: %s via porta remota %d", s.ProxyAddress, s.ProxyPort)
+	}
+
 	// Cria a configuração SSH
+	s.debugLog("Criando configuração SSH...")
 	config, err := s.createSSHConfig()
 	if err != nil {
 		return fmt.Errorf("erro ao criar configuração SSH: %w", err)
@@ -50,6 +70,7 @@ func (s *SSHConnection) Connect() error {
 		return fmt.Errorf("erro ao conectar: %w", err)
 	}
 	defer client.Close()
+	s.debugLog("Conexão SSH estabelecida com sucesso")
 
 	// Tenta instalar a chave pública se necessário
 	if err := s.installPublicKeyIfNeeded(client); err != nil {
@@ -59,6 +80,7 @@ func (s *SSHConnection) Connect() error {
 
 	// Configura remote forwarding se proxy estiver habilitado
 	if s.ProxyEnabled {
+		s.debugLog("Configurando proxy reverso (remote forwarding)...")
 		if err := s.setupRemoteForwarding(client); err != nil {
 			fmt.Fprintf(os.Stderr, "⚠️  Aviso: Não foi possível configurar proxy forwarding: %v\n", err)
 		} else {
@@ -69,6 +91,7 @@ func (s *SSHConnection) Connect() error {
 	}
 
 	// Cria uma sessão SSH
+	s.debugLog("Criando sessão SSH...")
 	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("erro ao criar sessão: %w", err)
@@ -76,6 +99,7 @@ func (s *SSHConnection) Connect() error {
 	defer session.Close()
 
 	// Inicia a sessão interativa
+	s.debugLog("Iniciando sessão interativa...")
 	if err := s.startInteractiveSession(session); err != nil {
 		return fmt.Errorf("erro na sessão interativa: %w", err)
 	}
@@ -92,7 +116,13 @@ func (s *SSHConnection) ExecuteCommand() error {
 	fmt.Printf("   Comando: %s\n", s.Command)
 	fmt.Println()
 
+	s.debugLog("Iniciando execução de comando remoto")
+	s.debugLog("Usuário: %s", s.User)
+	s.debugLog("Host: %s:%d", s.Host, s.Port)
+	s.debugLog("Comando: %s", s.Command)
+
 	// Cria a configuração SSH
+	s.debugLog("Criando configuração SSH...")
 	config, err := s.createSSHConfig()
 	if err != nil {
 		return fmt.Errorf("erro ao criar configuração SSH: %w", err)
@@ -104,6 +134,7 @@ func (s *SSHConnection) ExecuteCommand() error {
 		return fmt.Errorf("erro ao conectar: %w", err)
 	}
 	defer client.Close()
+	s.debugLog("Conexão SSH estabelecida com sucesso")
 
 	// Tenta instalar a chave pública se necessário
 	if err := s.installPublicKeyIfNeeded(client); err != nil {
@@ -112,6 +143,7 @@ func (s *SSHConnection) ExecuteCommand() error {
 	}
 
 	// Cria uma sessão SSH
+	s.debugLog("Criando sessão SSH...")
 	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("erro ao criar sessão: %w", err)
@@ -123,12 +155,15 @@ func (s *SSHConnection) ExecuteCommand() error {
 	session.Stderr = os.Stderr
 
 	// Executa o comando
+	s.debugLog("Executando comando...")
 	if err := session.Run(s.Command); err != nil {
 		if exitErr, ok := err.(*ssh.ExitError); ok {
+			s.debugLog("Comando encerrado com exit code: %d", exitErr.ExitStatus())
 			return fmt.Errorf("comando encerrado com código: %d", exitErr.ExitStatus())
 		}
 		return fmt.Errorf("erro ao executar comando: %w", err)
 	}
+	s.debugLog("Comando executado com sucesso (exit code: 0)")
 
 	return nil
 }
@@ -141,6 +176,7 @@ func (s *SSHConnection) createSSHConfig() (*ssh.ClientConfig, error) {
 // createAuthMethods cria os métodos de autenticação para SSH
 func (s *SSHConnection) createAuthMethods(sshKeyPaths []string, context string) []ssh.AuthMethod {
 	authMethods := []ssh.AuthMethod{}
+	var authNames []string
 
 	// Adiciona autenticação por chaves SSH (tenta todas as chaves configuradas)
 	var signers []ssh.Signer
@@ -150,27 +186,37 @@ func (s *SSHConnection) createAuthMethods(sshKeyPaths []string, context string) 
 		}
 		key, err := os.ReadFile(sshKeyPath)
 		if err != nil {
+			s.debugLog("Chave SSH: %s ... falha ao ler arquivo: %v", sshKeyPath, err)
 			continue
 		}
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
+			s.debugLog("Chave SSH: %s ... falha ao parsear: %v", sshKeyPath, err)
 			continue
 		}
+		s.debugLog("Chave SSH: %s ... OK", sshKeyPath)
 		signers = append(signers, signer)
 	}
 	if len(signers) > 0 {
 		authMethods = append(authMethods, ssh.PublicKeys(signers...))
+		authNames = append(authNames, fmt.Sprintf("publickey (%d chave(s))", len(signers)))
 	}
 
 	// Adiciona autenticação via SSH Agent se disponível
 	if agentAuth := s.getSSHAgentAuth(); agentAuth != nil {
 		authMethods = append(authMethods, agentAuth)
+		s.debugLog("SSH Agent: disponível")
+		authNames = append(authNames, "agent")
+	} else {
+		s.debugLog("SSH Agent: não disponível")
 	}
 
 	// Adiciona autenticação por senha
 	if s.Password != "" {
 		// Se a senha foi pré-fornecida, usa ela diretamente
 		authMethods = append(authMethods, ssh.Password(s.Password))
+		s.debugLog("Senha: pré-fornecida")
+		authNames = append(authNames, "password (pré-fornecida)")
 	} else if s.InteractivePasswordAllowed {
 		// Só pede senha interativamente se permitido (modo single host)
 		// Em modo múltiplos hosts, isso é desabilitado para evitar múltiplos prompts
@@ -183,7 +229,11 @@ func (s *SSHConnection) createAuthMethods(sshKeyPaths []string, context string) 
 			}
 			return string(password), nil
 		}))
+		s.debugLog("Senha: interativa (será solicitada se necessário)")
+		authNames = append(authNames, "password (interativa)")
 	}
+
+	s.debugLog("Métodos de autenticação: [%s]", strings.Join(authNames, ", "))
 
 	return authMethods
 }
@@ -207,10 +257,18 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 
 	// Conexão direta se não usar Jump Host
 	if s.JumpHost == nil {
-		return ssh.Dial("tcp", address, config)
+		s.debugLog("Conectando diretamente a %s...", address)
+		client, err := ssh.Dial("tcp", address, config)
+		if err != nil {
+			s.debugLog("Falha na conexão direta: %v", err)
+			return nil, err
+		}
+		s.debugLog("Conexão direta estabelecida")
+		return client, nil
 	}
 
 	// Cria métodos de autenticação específicos para o Jump Host
+	s.debugLog("Preparando autenticação do Jump Host: %s (%s@%s:%d)", s.JumpHost.Name, s.JumpHost.User, s.JumpHost.Host, s.JumpHost.Port)
 	jumpAuthMethods := s.createAuthMethods(s.JumpHostSSHKeys, fmt.Sprintf("%s@%s (Jump Host)", s.JumpHost.User, s.JumpHost.Host))
 
 	// Cria configuração separada para Jump Host
@@ -222,15 +280,19 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 
 	// Conecta ao Jump Host
 	jumpAddress := fmt.Sprintf("%s:%d", s.JumpHost.Host, s.JumpHost.Port)
+	s.debugLog("Conectando ao Jump Host %s...", jumpAddress)
 	jumpClient, err := ssh.Dial("tcp", jumpAddress, jumpConfig)
 	if err != nil {
+		s.debugLog("Falha na conexão ao Jump Host: %v", err)
 		return nil, fmt.Errorf("erro ao conectar ao Jump Host %s: %w", s.JumpHost.Name, err)
 	}
+	s.debugLog("Jump Host conectado, criando tunnel para %s...", address)
 
 	// Conecta ao host final através do Jump Host
 	conn, err := jumpClient.Dial("tcp", address)
 	if err != nil {
 		jumpClient.Close()
+		s.debugLog("Falha ao criar tunnel: %v", err)
 		return nil, fmt.Errorf("erro ao conectar ao host através do Jump Host: %w", err)
 	}
 
@@ -239,9 +301,11 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 	if err != nil {
 		conn.Close()
 		jumpClient.Close()
+		s.debugLog("Falha ao criar conexão SSH sobre tunnel: %v", err)
 		return nil, fmt.Errorf("erro ao criar conexão SSH: %w", err)
 	}
 
+	s.debugLog("Tunnel estabelecido com sucesso")
 	return ssh.NewClient(ncc, chans, reqs), nil
 }
 
@@ -270,6 +334,7 @@ func (s *SSHConnection) startInteractiveSession(session *ssh.Session) error {
 	}
 
 	// Solicita um pseudo-terminal
+	s.debugLog("Solicitando PTY (xterm-256color, %dx%d)", width, height)
 	if err := session.RequestPty("xterm-256color", height, width, modes); err != nil {
 		return fmt.Errorf("erro ao solicitar PTY: %w", err)
 	}
@@ -316,11 +381,14 @@ func (s *SSHConnection) monitorTerminalResize(session *ssh.Session, fd int) {
 func (s *SSHConnection) getSSHAgentAuth() ssh.AuthMethod {
 	socket := os.Getenv("SSH_AUTH_SOCK")
 	if socket == "" {
+		s.debugLog("SSH_AUTH_SOCK não definido")
 		return nil
 	}
 
+	s.debugLog("SSH_AUTH_SOCK: %s", socket)
 	conn, err := net.Dial("unix", socket)
 	if err != nil {
+		s.debugLog("Falha ao conectar ao SSH Agent: %v", err)
 		return nil
 	}
 
@@ -347,10 +415,13 @@ func (s *SSHConnection) setupRemoteForwarding(client *ssh.Client) error {
 	// Remote forwarding: host remoto porta ProxyPort -> proxy local ProxyAddress
 	remoteAddr := fmt.Sprintf("127.0.0.1:%d", s.ProxyPort)
 
+	s.debugLog("Remote forwarding: %s -> %s", remoteAddr, s.ProxyAddress)
 	listener, err := client.Listen("tcp", remoteAddr)
 	if err != nil {
+		s.debugLog("Falha ao criar listener remoto: %v", err)
 		return fmt.Errorf("erro ao criar listener remoto: %w", err)
 	}
+	s.debugLog("Listener remoto criado em %s", remoteAddr)
 
 	// Goroutine para aceitar conexões e fazer forwarding
 	go func() {
@@ -439,6 +510,7 @@ func readPublicKey(privateKeyPath string) (string, error) {
 func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 	// Se não há chave SSH configurada, não faz nada
 	if len(s.SSHKeys) == 0 {
+		s.debugLog("Instalação de chave pública: nenhuma chave SSH configurada")
 		return nil
 	}
 
@@ -449,6 +521,7 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 	pubKeyPath := sshKey + ".pub"
 	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
 		// Se a chave pública não existe, retorna silenciosamente (não é erro)
+		s.debugLog("Chave pública não encontrada: %s", pubKeyPath)
 		return nil
 	}
 
@@ -456,8 +529,10 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 	pubKey, err := readPublicKey(sshKey)
 	if err != nil {
 		// Se não conseguir ler a chave pública, retorna silenciosamente (não é erro crítico)
+		s.debugLog("Falha ao ler chave pública: %v", err)
 		return nil
 	}
+	s.debugLog("Chave pública carregada: %s", pubKeyPath)
 
 	// Cria uma nova sessão para verificar/instalar a chave
 	session, err := client.NewSession()
@@ -468,11 +543,13 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 
 	// Verifica se a chave já existe no authorized_keys
 	// Usa grep -Fxq para busca exata (Fixed string, eXact match, Quiet)
+	s.debugLog("Verificando se chave já está instalada no servidor...")
 	checkCmd := fmt.Sprintf("grep -Fxq %q ~/.ssh/authorized_keys 2>/dev/null", pubKey)
 	err = session.Run(checkCmd)
 
 	// Se exit code == 0, a chave já existe, não precisa instalar
 	if err == nil {
+		s.debugLog("Chave pública já instalada no servidor")
 		return nil
 	}
 
@@ -482,6 +559,7 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 	}
 
 	// Chave não existe, precisa instalar
+	s.debugLog("Chave pública não encontrada no servidor, instalando...")
 	// Cria nova sessão para instalação
 	installSession, err := client.NewSession()
 	if err != nil {
@@ -500,12 +578,13 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 	}
 
 	// Sucesso - informa o usuário
+	s.debugLog("Chave pública instalada com sucesso")
 	fmt.Fprintf(os.Stderr, "✅ Chave pública instalada com sucesso no servidor remoto\n")
 	return nil
 }
 
 // NewSSHConnection cria uma nova conexão SSH
-func NewSSHConnection(user, host string, port int, sshKeys []string, password string, jumpHost *config.JumpHost, jumpHostSSHKeys []string, command string, proxyEnabled bool, proxyAddress string, proxyPort int) *SSHConnection {
+func NewSSHConnection(user, host string, port int, sshKeys []string, password string, jumpHost *config.JumpHost, jumpHostSSHKeys []string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, verbose bool) *SSHConnection {
 	return &SSHConnection{
 		User:                       user,
 		Host:                       host,
@@ -519,5 +598,6 @@ func NewSSHConnection(user, host string, port int, sshKeys []string, password st
 		ProxyAddress:               proxyAddress,
 		ProxyPort:                  proxyPort,
 		InteractivePasswordAllowed: true, // Por padrão, permite senha interativa (modo single host)
+		Verbose:                    verbose,
 	}
 }

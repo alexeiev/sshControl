@@ -91,10 +91,11 @@ type model struct {
 	version         string
 	quitting        bool
 	proxyEnabled    bool
+	verbose         bool
 }
 
 // ShowInteractive exibe o menu interativo usando bubbletea
-func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost, version string, proxyEnabled bool) {
+func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost *config.JumpHost, version string, proxyEnabled bool, verbose bool) {
 	// Filtra hosts para TUI (exclui hosts com tag "autocreated")
 	tuiHosts := cfg.GetHostsForTUI()
 
@@ -151,6 +152,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 		allItems:     items,
 		version:      version,
 		proxyEnabled: proxyEnabled,
+		verbose:      verbose,
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -188,6 +190,7 @@ func ShowInteractive(cfg *config.ConfigFile, selectedUser *config.User, jumpHost
 			proxyActive,
 			proxyAddress,
 			proxyPort,
+			m.verbose,
 		)
 
 		if err := sshConn.Connect(); err != nil {

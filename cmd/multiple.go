@@ -61,7 +61,7 @@ func expandTagsToHosts(cfg *config.ConfigFile, hostArgs []string) ([]string, []s
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
-func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool) {
+func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, verbose bool) {
 	// Determina o usuário efetivo
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
 	if effectiveUser == nil {
@@ -133,7 +133,7 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 		wg.Add(1)
 		go func(hostArg string) {
 			defer wg.Done()
-			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command, proxyActive, proxyAddress, proxyPort, askPassword)
+			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command, proxyActive, proxyAddress, proxyPort, askPassword, verbose)
 			results <- result
 		}(hostArg)
 	}
@@ -163,7 +163,7 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
-func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, askPassword bool) HostResult {
+func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, askPassword bool, verbose bool) HostResult {
 	var hostname string
 	var port int
 	var sshKeys []string
@@ -231,6 +231,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		proxyEnabled,
 		proxyAddress,
 		proxyPort,
+		verbose,
 	)
 
 	// Em modo múltiplos hosts, desabilita prompt interativo de senha
@@ -361,7 +362,11 @@ func displayResults(results []HostResult, duration time.Duration) {
 
 // ExecuteCommandWithOutput executa um comando remoto e retorna a saída
 func (s *SSHConnection) ExecuteCommandWithOutput() (output string, exitCode int, err error) {
+	s.debugLog("Iniciando execução com captura de saída")
+	s.debugLog("Host: %s:%d | Comando: %s", s.Host, s.Port, s.Command)
+
 	// Cria a configuração SSH
+	s.debugLog("Criando configuração SSH...")
 	config, err := s.createSSHConfig()
 	if err != nil {
 		return "", -1, fmt.Errorf("erro ao criar configuração SSH: %w", err)
@@ -373,11 +378,13 @@ func (s *SSHConnection) ExecuteCommandWithOutput() (output string, exitCode int,
 		return "", -1, fmt.Errorf("erro ao conectar: %w", err)
 	}
 	defer client.Close()
+	s.debugLog("Conexão SSH estabelecida com sucesso")
 
 	// Tenta instalar a chave pública se necessário (não bloqueia em caso de erro)
 	_ = s.installPublicKeyIfNeeded(client)
 
 	// Cria uma sessão SSH
+	s.debugLog("Criando sessão SSH...")
 	session, err := client.NewSession()
 	if err != nil {
 		return "", -1, fmt.Errorf("erro ao criar sessão: %w", err)
@@ -390,6 +397,7 @@ func (s *SSHConnection) ExecuteCommandWithOutput() (output string, exitCode int,
 	session.Stderr = &stderr
 
 	// Executa o comando
+	s.debugLog("Executando comando...")
 	err = session.Run(s.Command)
 
 	// Combina stdout e stderr
@@ -403,11 +411,13 @@ func (s *SSHConnection) ExecuteCommandWithOutput() (output string, exitCode int,
 	if err != nil {
 		if exitErr, ok := err.(*ssh.ExitError); ok {
 			exitCode = exitErr.ExitStatus()
+			s.debugLog("Comando encerrado com exit code: %d", exitCode)
 			// Se temos um exit code, não é um erro de conexão
 			return combinedOutput, exitCode, nil
 		}
 		return combinedOutput, -1, fmt.Errorf("erro ao executar comando: %w", err)
 	}
 
+	s.debugLog("Comando executado com sucesso (exit code: 0)")
 	return combinedOutput, exitCode, nil
 }

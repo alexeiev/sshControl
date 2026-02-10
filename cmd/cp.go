@@ -28,6 +28,7 @@ type FileTransfer struct {
 	LocalPath  string
 	RemotePath string
 	Recursive  bool
+	Verbose    bool
 }
 
 // ProgressWriter implementa io.Writer para exibir progresso
@@ -124,7 +125,11 @@ func formatBytes(bytes int64) string {
 
 // Download baixa um arquivo ou diretório do servidor remoto
 func (ft *FileTransfer) Download(sshConn *SSHConnection) error {
+	sshConn.debugLog("Iniciando download SFTP")
+	sshConn.debugLog("Remoto: %s | Local: %s | Recursivo: %v", ft.RemotePath, ft.LocalPath, ft.Recursive)
+
 	// Cria a configuração SSH
+	sshConn.debugLog("Criando configuração SSH...")
 	sshConfig, err := sshConn.createSSHConfig()
 	if err != nil {
 		return fmt.Errorf("erro ao criar configuração SSH: %w", err)
@@ -138,11 +143,13 @@ func (ft *FileTransfer) Download(sshConn *SSHConnection) error {
 	defer client.Close()
 
 	// Cria cliente SFTP
+	sshConn.debugLog("Criando cliente SFTP...")
 	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
 		return fmt.Errorf("erro ao criar cliente SFTP: %w", err)
 	}
 	defer sftpClient.Close()
+	sshConn.debugLog("Cliente SFTP criado com sucesso")
 
 	// Expande ~ para o diretório home do usuário remoto
 	remotePath := expandRemotePath(sftpClient, ft.RemotePath)
@@ -247,6 +254,9 @@ func (ft *FileTransfer) downloadDir(sftpClient *sftp.Client, remotePath, localPa
 
 // Upload envia um arquivo ou diretório para o servidor remoto
 func (ft *FileTransfer) Upload(sshConn *SSHConnection) error {
+	sshConn.debugLog("Iniciando upload SFTP")
+	sshConn.debugLog("Local: %s | Remoto: %s | Recursivo: %v", ft.LocalPath, ft.RemotePath, ft.Recursive)
+
 	// Verifica se arquivo/diretório local existe
 	localInfo, err := os.Stat(ft.LocalPath)
 	if err != nil {
@@ -254,6 +264,7 @@ func (ft *FileTransfer) Upload(sshConn *SSHConnection) error {
 	}
 
 	// Cria a configuração SSH
+	sshConn.debugLog("Criando configuração SSH...")
 	sshConfig, err := sshConn.createSSHConfig()
 	if err != nil {
 		return fmt.Errorf("erro ao criar configuração SSH: %w", err)
@@ -267,11 +278,13 @@ func (ft *FileTransfer) Upload(sshConn *SSHConnection) error {
 	defer client.Close()
 
 	// Cria cliente SFTP
+	sshConn.debugLog("Criando cliente SFTP...")
 	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
 		return fmt.Errorf("erro ao criar cliente SFTP: %w", err)
 	}
 	defer sftpClient.Close()
+	sshConn.debugLog("Cliente SFTP criado com sucesso")
 
 	hostLabel := fmt.Sprintf("%s@%s", sshConn.User, sshConn.Host)
 
@@ -539,6 +552,7 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 		false, // sem proxy
 		"",
 		0,
+		ft.Verbose,
 	)
 	sshConn.InteractivePasswordAllowed = false
 

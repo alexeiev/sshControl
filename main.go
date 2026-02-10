@@ -29,6 +29,7 @@ var (
 	showVersion   bool
 	proxyEnabled  bool
 	askPassword   bool
+	verbose       bool
 
 	// Flags do comando cp
 	cpRecursive bool
@@ -322,7 +323,7 @@ PORT FORWARD (Túnel SSH)
 COMANDOS ÚTEIS
   sc -s                     Lista servidores e jump hosts cadastrados
   sc -s @tag                Lista servidores filtrados por tag
-  sc -v, sc --version       Exibe versão do sshControl
+  sc -V, sc --version       Exibe versão do sshControl
   sc update                 Atualiza para versão mais recente
   sc cp                     Copia arquivos via SFTP (veja sc cp --help)
   sc port-forward           Encaminha porta local para remota (veja sc port-forward --help)
@@ -339,7 +340,8 @@ FLAGS DISPONÍVEIS
   -s, --servers             Lista servidores cadastrados
   -p, --proxy               Habilita proxy reverso
   -a, --ask-password        Solicita senha antes de conectar
-  -v, --version             Exibe versão
+  -v, --verbose             Modo debug (informações detalhadas da conexão)
+  -V, --version             Exibe versão
   -h, --help                Exibe ajuda
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -378,15 +380,17 @@ func init() {
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
 	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (requer -c)")
 	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista servidores (use 'sc -s @tag' para filtrar por tag)")
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Exibe a versão do sshControl")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Exibe a versão do sshControl")
 	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
 	rootCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação (útil para automações)")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
 
 	// Flags do comando cp (persistentes para down e up)
 	cpCmd.PersistentFlags().BoolVarP(&cpRecursive, "recursive", "r", false, "Copia diretórios recursivamente")
 	cpCmd.PersistentFlags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
 	cpCmd.PersistentFlags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice)")
 	cpCmd.PersistentFlags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
+	cpCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
 
 	// Flag específica do upload para múltiplos hosts
 	cpUpCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Envia para múltiplos hosts em paralelo")
@@ -395,13 +399,14 @@ func init() {
 	pfCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
 	pfCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice)")
 	pfCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
+	pfCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
 	// Inicia verificação de atualizações em background (não bloqueante)
 	updateResultChan := checkForUpdatesBackground(version)
 
-	// Se a flag -v foi usada, exibe a versão e sai
+	// Se a flag -V foi usada, exibe a versão e sai
 	if showVersion {
 		fmt.Printf("sshControl (sc) versão %s\n", version)
 		fmt.Printf("Build: %s\n", buildDate)
@@ -496,7 +501,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
 			os.Exit(1)
 		}
-		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
+		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, verbose)
 		showUpdateNotification(updateResultChan, version)
 		return
 	}
@@ -504,7 +509,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword)
+		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, verbose)
 		showUpdateNotification(updateResultChan, version)
 		return
 	}
@@ -517,7 +522,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	}
 
 	// Modo interativo (menu)
-	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version, proxyEnabled)
+	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version, proxyEnabled, verbose)
 	showUpdateNotification(updateResultChan, version)
 }
 
@@ -764,6 +769,7 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		false,
 		"",
 		0,
+		verbose,
 	)
 
 	// Cria transferência
@@ -771,6 +777,7 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		LocalPath:  localPath,
 		RemotePath: remotePath,
 		Recursive:  cpRecursive,
+		Verbose:    verbose,
 	}
 
 	fmt.Println()
@@ -895,6 +902,7 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		LocalPath:  localPath,
 		RemotePath: remotePath,
 		Recursive:  cpRecursive,
+		Verbose:    verbose,
 	}
 
 	// Modo múltiplos hosts
@@ -995,6 +1003,7 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		false,
 		"",
 		0,
+		verbose,
 	)
 
 	fmt.Println()
@@ -1144,6 +1153,7 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 		false,
 		"",
 		0,
+		verbose,
 	)
 
 	// Cria sessão de port forward

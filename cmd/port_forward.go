@@ -52,7 +52,10 @@ func (pf *PortForwardSession) Start() error {
 	fmt.Printf("   %s\n", pf.SSHConn.formatConnectionString())
 	fmt.Println()
 
+	pf.SSHConn.debugLog("Iniciando port forward: local %d -> remoto %s:%d", pf.Forward.LocalPort, pf.Forward.RemoteHost, pf.Forward.RemotePort)
+
 	// Cria a configuração SSH
+	pf.SSHConn.debugLog("Criando configuração SSH...")
 	config, err := pf.SSHConn.createSSHConfig()
 	if err != nil {
 		return fmt.Errorf("erro ao criar configuração SSH: %w", err)
@@ -64,15 +67,18 @@ func (pf *PortForwardSession) Start() error {
 		return fmt.Errorf("erro ao conectar: %w", err)
 	}
 	pf.client = client
+	pf.SSHConn.debugLog("Conexão SSH estabelecida para port forward")
 
 	// Inicia listener local
 	localAddr := fmt.Sprintf("0.0.0.0:%d", pf.Forward.LocalPort)
+	pf.SSHConn.debugLog("Criando listener local em %s...", localAddr)
 	listener, err := net.Listen("tcp", localAddr)
 	if err != nil {
 		client.Close()
 		return fmt.Errorf("erro ao escutar na porta local %d: %w", pf.Forward.LocalPort, err)
 	}
 	pf.listener = listener
+	pf.SSHConn.debugLog("Listener local criado com sucesso")
 
 	// Exibe informações do tunnel
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
