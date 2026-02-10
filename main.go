@@ -322,7 +322,7 @@ PORT FORWARD (Túnel SSH)
 COMANDOS ÚTEIS
   sc -s                     Lista servidores e jump hosts cadastrados
   sc -s @tag                Lista servidores filtrados por tag
-  sc -v, sc --version       Exibe versão do sshControl
+  sc -V, sc --version       Exibe versão do sshControl
   sc update                 Atualiza para versão mais recente
   sc cp                     Copia arquivos via SFTP (veja sc cp --help)
   sc port-forward           Encaminha porta local para remota (veja sc port-forward --help)
@@ -339,7 +339,7 @@ FLAGS DISPONÍVEIS
   -s, --servers             Lista servidores cadastrados
   -p, --proxy               Habilita proxy reverso
   -a, --ask-password        Solicita senha antes de conectar
-  -v, --version             Exibe versão
+  -V, --version             Exibe versão
   -h, --help                Exibe ajuda
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -378,7 +378,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
 	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (requer -c)")
 	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista servidores (use 'sc -s @tag' para filtrar por tag)")
-	rootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Exibe a versão do sshControl")
+	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Exibe a versão do sshControl")
 	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
 	rootCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação (útil para automações)")
 
@@ -401,7 +401,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	// Inicia verificação de atualizações em background (não bloqueante)
 	updateResultChan := checkForUpdatesBackground(version)
 
-	// Se a flag -v foi usada, exibe a versão e sai
+	// Se a flag -V foi usada, exibe a versão e sai
 	if showVersion {
 		fmt.Printf("sshControl (sc) versão %s\n", version)
 		fmt.Printf("Build: %s\n", buildDate)
