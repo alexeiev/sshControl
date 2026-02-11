@@ -90,6 +90,11 @@ func InitializeConfigDir() (string, error) {
 		fmt.Printf("✓ Arquivo de configuração criado: %s\n", configFile)
 		fmt.Println("✓ Configuração de exemplo criada. Edite o arquivo para adicionar seus hosts.")
 		fmt.Println()
+	} else {
+		// Config já existe - verifica se há novas opções a serem adicionadas
+		if err := MigrateConfig(configFile); err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Aviso: erro ao verificar atualizações do config: %v\n", err)
+		}
 	}
 
 	return configFile, nil

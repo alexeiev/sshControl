@@ -5,6 +5,19 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.7.0] - 2026-02-11
+
+### Added
+
+- **Migração automática do config.yaml**: Ao iniciar, o sshControl verifica se o `config.yaml` do usuário possui todas as chaves disponíveis no template atual e adiciona automaticamente as faltantes
+  - Chaves de configuração ausentes (ex: `auto_create`, `proxy`, `proxy_port`, `dir_cp_default`, `jump_hosts`) são adicionadas com valores padrão do template
+  - Campos faltantes em itens de listas existentes também são adicionados (ex: `tags: []` em hosts que não possuíam o campo)
+  - Comentários explicativos do template são preservados nas chaves adicionadas
+  - Dados existentes do usuário nunca são removidos ou sobrescritos
+  - Processo é idempotente: execuções subsequentes não geram alterações desnecessárias
+  - Mensagem informativa exibida apenas quando há atualizações no config
+- Novo arquivo `config/migrate.go` com lógica de migração baseada em deep merge via `yaml.Node`
+
 ## [0.6.0] - 2026-02-10
 
 ### Added
@@ -209,7 +222,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/alexeiev/sshControl/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/alexeiev/sshControl/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/alexeiev/sshControl/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/alexeiev/sshControl/compare/v0.5.0...v0.5.1
