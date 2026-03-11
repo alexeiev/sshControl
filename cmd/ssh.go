@@ -2,15 +2,18 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 
 	"github.com/alexeiev/sshControl/config"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
@@ -506,6 +509,29 @@ func readPublicKey(privateKeyPath string) (string, error) {
 	return pubKey, nil
 }
 
+func readConfiguredPublicKeys(sshKeys []string, debugLog func(string, ...interface{})) []string {
+	var pubKeys []string
+
+	for _, sshKey := range sshKeys {
+		pubKeyPath := sshKey + ".pub"
+		if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
+			debugLog("Chave pública não encontrada: %s", pubKeyPath)
+			continue
+		}
+
+		pubKey, err := readPublicKey(sshKey)
+		if err != nil {
+			debugLog("Falha ao ler chave pública %s: %v", pubKeyPath, err)
+			continue
+		}
+
+		debugLog("Chave pública carregada: %s", pubKeyPath)
+		pubKeys = append(pubKeys, pubKey)
+	}
+
+	return pubKeys
+}
+
 // installPublicKeyIfNeeded instala a chave pública no servidor remoto se ainda não estiver presente
 func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 	// Se não há chave SSH configurada, não faz nada
@@ -514,72 +540,91 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 		return nil
 	}
 
-	// Usa a primeira chave configurada para instalação
-	sshKey := s.SSHKeys[0]
-
-	// Verifica se o arquivo de chave pública existe antes de tentar ler
-	pubKeyPath := sshKey + ".pub"
-	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
-		// Se a chave pública não existe, retorna silenciosamente (não é erro)
-		s.debugLog("Chave pública não encontrada: %s", pubKeyPath)
+	pubKeys := readConfiguredPublicKeys(s.SSHKeys, s.debugLog)
+	if len(pubKeys) == 0 {
+		s.debugLog("Nenhuma chave pública disponível para instalação")
 		return nil
 	}
 
-	// Tenta ler a chave pública
-	pubKey, err := readPublicKey(sshKey)
+	s.debugLog("Verificando instalação de %d chave(s) pública(s) no servidor...", len(pubKeys))
+	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
-		// Se não conseguir ler a chave pública, retorna silenciosamente (não é erro crítico)
-		s.debugLog("Falha ao ler chave pública: %v", err)
+		return fmt.Errorf("erro ao criar cliente SFTP para instalação de chave: %w", err)
+	}
+	defer sftpClient.Close()
+
+	homeDir, err := sftpClient.Getwd()
+	if err != nil {
+		return fmt.Errorf("erro ao obter diretório home remoto: %w", err)
+	}
+
+	sshDir := path.Join(homeDir, ".ssh")
+	authorizedKeysPath := path.Join(sshDir, "authorized_keys")
+
+	if err := sftpClient.MkdirAll(sshDir); err != nil {
+		return fmt.Errorf("erro ao criar diretório remoto .ssh: %w", err)
+	}
+	if err := sftpClient.Chmod(sshDir, 0700); err != nil {
+		s.debugLog("Não foi possível ajustar permissão de %s: %v", sshDir, err)
+	}
+
+	existingKeys := make(map[string]struct{})
+	if remoteFile, err := sftpClient.Open(authorizedKeysPath); err == nil {
+		defer remoteFile.Close()
+
+		content, readErr := io.ReadAll(remoteFile)
+		if readErr != nil {
+			return fmt.Errorf("erro ao ler authorized_keys remoto: %w", readErr)
+		}
+
+		for _, line := range strings.Split(string(content), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				existingKeys[line] = struct{}{}
+			}
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("erro ao abrir authorized_keys remoto: %w", err)
+	}
+
+	var missingKeys []string
+	for _, pubKey := range pubKeys {
+		if _, exists := existingKeys[pubKey]; exists {
+			continue
+		}
+		missingKeys = append(missingKeys, pubKey)
+	}
+
+	if len(missingKeys) == 0 {
+		s.debugLog("Todas as chaves públicas configuradas já estão instaladas no servidor")
 		return nil
 	}
-	s.debugLog("Chave pública carregada: %s", pubKeyPath)
 
-	// Cria uma nova sessão para verificar/instalar a chave
-	session, err := client.NewSession()
+	s.debugLog("Instalando %d chave(s) pública(s) ausente(s)...", len(missingKeys))
+	remoteFile, err := sftpClient.OpenFile(authorizedKeysPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND)
 	if err != nil {
-		return fmt.Errorf("erro ao criar sessão para instalação de chave: %w", err)
+		return fmt.Errorf("erro ao abrir authorized_keys para escrita: %w", err)
 	}
-	defer session.Close()
+	defer remoteFile.Close()
 
-	// Verifica se a chave já existe no authorized_keys
-	// Usa grep -Fxq para busca exata (Fixed string, eXact match, Quiet)
-	s.debugLog("Verificando se chave já está instalada no servidor...")
-	checkCmd := fmt.Sprintf("grep -Fxq %q ~/.ssh/authorized_keys 2>/dev/null", pubKey)
-	err = session.Run(checkCmd)
-
-	// Se exit code == 0, a chave já existe, não precisa instalar
-	if err == nil {
-		s.debugLog("Chave pública já instalada no servidor")
-		return nil
+	if len(existingKeys) > 0 {
+		if _, err := remoteFile.Write([]byte("\n")); err != nil {
+			return fmt.Errorf("erro ao preparar separador em authorized_keys: %w", err)
+		}
 	}
 
-	// Se o erro não é um exit error, algo deu errado
-	if _, ok := err.(*ssh.ExitError); !ok {
-		return fmt.Errorf("erro ao verificar chave existente: %w", err)
+	for _, pubKey := range missingKeys {
+		if _, err := remoteFile.Write([]byte(pubKey + "\n")); err != nil {
+			return fmt.Errorf("erro ao adicionar chave pública em authorized_keys: %w", err)
+		}
 	}
 
-	// Chave não existe, precisa instalar
-	s.debugLog("Chave pública não encontrada no servidor, instalando...")
-	// Cria nova sessão para instalação
-	installSession, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("erro ao criar sessão para instalação: %w", err)
-	}
-	defer installSession.Close()
-
-	// Comando para instalar a chave (cria .ssh se necessário, adiciona chave, ajusta permissões)
-	installCmd := fmt.Sprintf(
-		"mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo %q >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys",
-		pubKey,
-	)
-
-	if err := installSession.Run(installCmd); err != nil {
-		return fmt.Errorf("erro ao instalar chave pública: %w", err)
+	if err := sftpClient.Chmod(authorizedKeysPath, 0600); err != nil {
+		s.debugLog("Não foi possível ajustar permissão de %s: %v", authorizedKeysPath, err)
 	}
 
-	// Sucesso - informa o usuário
-	s.debugLog("Chave pública instalada com sucesso")
-	fmt.Fprintf(os.Stderr, "✅ Chave pública instalada com sucesso no servidor remoto\n")
+	s.debugLog("%d chave(s) pública(s) instalada(s) com sucesso", len(missingKeys))
+	fmt.Fprintf(os.Stderr, "✅ %d chave(s) pública(s) instalada(s) com sucesso no servidor remoto\n", len(missingKeys))
 	return nil
 }
 
