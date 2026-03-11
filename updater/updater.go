@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -290,6 +292,76 @@ func (u *Updater) compareVersions(current, latest string) bool {
 		return true
 	}
 
-	// Comparação simples de strings (funciona para semver básico)
+	currentCore, currentSuffix := splitVersionCore(current)
+	latestCore, latestSuffix := splitVersionCore(latest)
+
+	currentParts, currentOK := parseVersionParts(currentCore)
+	latestParts, latestOK := parseVersionParts(latestCore)
+	if currentOK && latestOK {
+		if cmp := compareVersionParts(currentParts, latestParts); cmp != 0 {
+			return cmp < 0
+		}
+		if currentSuffix != "" && latestSuffix == "" {
+			return true
+		}
+		if currentSuffix == "" && latestSuffix != "" {
+			return false
+		}
+		if currentSuffix != "" && latestSuffix != "" {
+			return latestSuffix > currentSuffix
+		}
+	}
+
 	return latest > current
+}
+
+func splitVersionCore(version string) (string, string) {
+	for i, char := range version {
+		if char == '-' || char == '+' {
+			return version[:i], version[i+1:]
+		}
+	}
+	return version, ""
+}
+
+func parseVersionParts(version string) ([]int, bool) {
+	if version == "" {
+		return nil, false
+	}
+
+	parts := strings.Split(version, ".")
+	parsed := make([]int, 0, len(parts))
+	for _, part := range parts {
+		if part == "" {
+			return nil, false
+		}
+		value, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, false
+		}
+		parsed = append(parsed, value)
+	}
+
+	return parsed, true
+}
+
+func compareVersionParts(currentParts, latestParts []int) int {
+	maxLen := int(math.Max(float64(len(currentParts)), float64(len(latestParts))))
+	for i := 0; i < maxLen; i++ {
+		currentPart := 0
+		latestPart := 0
+		if i < len(currentParts) {
+			currentPart = currentParts[i]
+		}
+		if i < len(latestParts) {
+			latestPart = latestParts[i]
+		}
+		if currentPart != latestPart {
+			if currentPart < latestPart {
+				return -1
+			}
+			return 1
+		}
+	}
+	return 0
 }
