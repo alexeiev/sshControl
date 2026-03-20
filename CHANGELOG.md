@@ -5,6 +5,17 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.8.0] - 2026-03-20
+
+### Added
+
+- **Suporte a arquivo texto na opção `-l`**: Agora o sshControl aceita listas de hosts informadas por arquivo, além da sintaxe tradicional com hosts separados por espaço
+  - Aceita arquivos texto com hosts separados por vírgula, ponto e vírgula ou um host por linha
+  - Suporta o uso de IPs, aliases do `config.yaml` e tags (`@tag`) dentro da mesma lista
+  - Funciona tanto na execução remota em múltiplos hosts (`sc -c "comando" -l lista.txt`) quanto no upload via SFTP (`sc cp up -l lista.txt arquivo destino`)
+  - Permite combinar arquivo de lista com hosts e tags passados diretamente na linha de comando
+- Novo arquivo `cmd/host_inputs.go` com o parser compartilhado para resolução de hosts, tags e arquivos de lista
+
 ## [0.7.1] - 2026-03-11
 
 ### Added
@@ -21,7 +32,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Instalação automática de chaves públicas no host remoto agora trata todas as chaves configuradas do usuário, não apenas a primeira
 - Verificação e atualização de `authorized_keys` agora é feita via SFTP, removendo a interpolação insegura de chave pública em shell remoto
-
+  
 ## [0.7.0] - 2026-02-11
 
 ### Added
@@ -239,7 +250,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/alexeiev/sshControl/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alexeiev/sshControl/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/alexeiev/sshControl/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/alexeiev/sshControl/compare/v0.5.1...v0.5.2
