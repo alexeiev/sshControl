@@ -9,7 +9,7 @@ import (
 	"github.com/alexeiev/sshControl/config"
 )
 
-func TestExpandTagsToHosts(t *testing.T) {
+func TestResolveHostInputs(t *testing.T) {
 	t.Parallel()
 
 	cfg := &config.ConfigFile{
@@ -20,16 +20,19 @@ func TestExpandTagsToHosts(t *testing.T) {
 		},
 	}
 
-	gotHosts, gotTags := expandTagsToHosts(cfg, []string{"@web", "db-1", "@prod", "@missing", "db-1"})
+	gotHosts, gotTags, err := ResolveHostInputs(cfg, []string{"@web", "db-1", "@prod", "@missing", "db-1"})
+	if err != nil {
+		t.Fatalf("ResolveHostInputs retornou erro: %v", err)
+	}
 
 	wantHosts := []string{"web-1", "web-2", "db-1"}
 	wantTags := []string{"web", "prod", "missing"}
 
 	if !reflect.DeepEqual(gotHosts, wantHosts) {
-		t.Fatalf("expandTagsToHosts hosts = %v, want %v", gotHosts, wantHosts)
+		t.Fatalf("ResolveHostInputs hosts = %v, want %v", gotHosts, wantHosts)
 	}
 	if !reflect.DeepEqual(gotTags, wantTags) {
-		t.Fatalf("expandTagsToHosts tags = %v, want %v", gotTags, wantTags)
+		t.Fatalf("ResolveHostInputs tags = %v, want %v", gotTags, wantTags)
 	}
 }
 
