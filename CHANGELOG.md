@@ -16,6 +16,23 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Permite combinar arquivo de lista com hosts e tags passados diretamente na linha de comando
 - Novo arquivo `cmd/host_inputs.go` com o parser compartilhado para resolução de hosts, tags e arquivos de lista
 
+## [0.7.1] - 2026-03-11
+
+### Added
+
+- Suíte inicial de testes automatizados para parsing de conexões, expansão de tags, resolução de configuração e comparação de versões
+- Workflow de CI para executar `go test ./...` em pushes para `main` e em Pull Requests contra `main`
+
+### Changed
+
+- Workflow de release agora executa os testes antes do build e só publica os binários se a suíte passar
+- Comparação de versões do updater agora considera partes numéricas corretamente, evitando erros em versões como `1.10.0` vs `1.9.0`
+
+### Fixed
+
+- Instalação automática de chaves públicas no host remoto agora trata todas as chaves configuradas do usuário, não apenas a primeira
+- Verificação e atualização de `authorized_keys` agora é feita via SFTP, removendo a interpolação insegura de chave pública em shell remoto
+  
 ## [0.7.0] - 2026-02-11
 
 ### Added
