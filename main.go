@@ -49,6 +49,7 @@ Para ver exemplos de uso e manual completo, execute: sc man`,
   sc <host>                    # Conecta diretamente ao host
   sc -c "comando" <host>       # Executa comando remoto
   sc -c "comando" -l <hosts>   # Executa em múltiplos hosts
+  sc -c "comando" -l lista.txt # Lê hosts de um arquivo texto
   sc -s                        # Lista servidores cadastrados
   sc -s @tag                   # Lista servidores filtrados por tag
   sc man                       # Exibe manual completo com exemplos`,
@@ -121,7 +122,7 @@ Use -r para copiar diretórios recursivamente.`,
 }
 
 var cpUpCmd = &cobra.Command{
-	Use:   "up [flags] <arquivo_local> [destino_remoto] <host>  OU  up -l [flags] <hosts...> <arquivo_local> [destino_remoto]",
+	Use:   "up [flags] <arquivo_local> [destino_remoto] <host>  OU  up -l [flags] <hosts...|arquivo.txt> <arquivo_local> [destino_remoto]",
 	Short: "Upload de arquivo/diretório para servidor(es)",
 	Long: `Envia um arquivo ou diretório local para servidor(es) remoto(s).
 
@@ -131,10 +132,11 @@ Use -r para copiar diretórios recursivamente.
 
 Ordem dos argumentos:
   - Host único:      sc cp up <arquivo_local> [destino_remoto] <host>
-  - Múltiplos hosts: sc cp up -l <hosts...> <arquivo_local> [destino_remoto]`,
+  - Múltiplos hosts: sc cp up -l <hosts...|arquivo.txt> <arquivo_local> [destino_remoto]`,
 	Example: `  sc cp up ./config.yaml webserver              # Envia para ~/config.yaml
   sc cp up ./config.yaml /etc/app/ webserver    # Envia para /etc/app/config.yaml
   sc cp up -l web1 web2 web3 ./script.sh /opt/scripts/
+  sc cp up -l lista.txt ./script.sh /opt/scripts/
   sc cp up -r ./dist/ /var/www/html/ webserver
   sc cp up -l app1 app2 -j prod-jump ./app.jar /opt/app/`,
 	Args: cobra.MinimumNArgs(2),
@@ -224,6 +226,7 @@ EXECUÇÃO EM MÚLTIPLOS HOSTS
   sc -c "free -h" -l 192.168.1.10 192.168.1.11
                                           Em múltiplos IPs
   sc -c "hostname" -l web1 192.168.1.50   Combina hosts e IPs
+  sc -c "uptime" -l lista.txt             Lê hosts de arquivo texto
   sc -j 1 -c "df -h" -l db1 db2 db3       Via jump host
   sc -a -c "uptime" -l web1 web2 web3     Solicita senha uma vez antes
 
@@ -242,6 +245,10 @@ TAGS (Agrupamento de Hosts)
   sc -c "uptime" -l @web                  Todos os hosts com tag "web"
   sc -c "df -h" -l @web @db               Múltiplas tags
   sc -c "hostname" -l @production server1 Combina tag e host
+
+  Também é possível informar um arquivo texto em -l:
+  sc -c "uptime" -l lista.txt             Um host por linha, ou separados por , e ;
+  sc -c "uptime" -l @web lista.txt        Combina tags, hosts e arquivo
 
   Na TUI, digite "/" e busque pelo nome da tag para filtrar.
 
@@ -266,7 +273,7 @@ CÓPIA DE ARQUIVOS (SFTP)
   Upload de arquivos para servidor(es):
   sc cp up [flags] <local> [remoto] <host>
                                          Envia arquivo para um host
-  sc cp up -l [flags] <hosts...> <local> [remoto]
+  sc cp up -l [flags] <hosts...|arquivo.txt> <local> [remoto]
                                          Envia para múltiplos hosts
                                          (default remoto: ~ home do usuário)
 
@@ -284,6 +291,7 @@ CÓPIA DE ARQUIVOS (SFTP)
   sc cp up ./config.yaml webserver
   sc cp up ./config.yaml /etc/app/ webserver
   sc cp up -l web1 web2 web3 ./script.sh /opt/
+  sc cp up -l lista.txt ./script.sh /opt/
   sc cp up -l @web ./deploy.sh /opt/
   sc cp up -r ./dist/ /var/www/html/ webserver
 
@@ -378,7 +386,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
 	rootCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice, ex: production-jump ou 1)")
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
-	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (requer -c)")
+	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (aceita hosts, tags e arquivo texto)")
 	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista servidores (use 'sc -s @tag' para filtrar por tag)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Exibe a versão do sshControl")
 	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
@@ -393,7 +401,7 @@ func init() {
 	cpCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
 
 	// Flag específica do upload para múltiplos hosts
-	cpUpCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Envia para múltiplos hosts em paralelo")
+	cpUpCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Envia para múltiplos hosts em paralelo (aceita arquivo texto)")
 
 	// Flags do comando port-forward
 	pfCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
@@ -490,7 +498,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	// Validação: -l requer -c
 	if multipleHosts && command == "" {
 		fmt.Fprintf(os.Stderr, "Erro: A opção -l requer especificar um comando com -c\n")
-		fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
+		fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> ... | arquivo.txt\n")
 		os.Exit(1)
 	}
 
@@ -498,7 +506,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	if multipleHosts {
 		if len(args) == 0 {
 			fmt.Fprintf(os.Stderr, "Erro: A opção -l requer especificar pelo menos um host\n")
-			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> <host3> ...\n")
+			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> ... | arquivo.txt\n")
 			os.Exit(1)
 		}
 		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, verbose)
@@ -797,42 +805,31 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 }
 
 func runCpUp(cobraCmd *cobra.Command, args []string) {
+	// Inicializa configuração
+	configPath, err := config.InitializeConfigDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao inicializar configuração: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao carregar %s: %v\n", configPath, err)
+		os.Exit(1)
+	}
+
 	var localPath string
 	var remotePath string
 	var hostArgs []string
 
 	// Ordem dos argumentos depende do modo:
-	// - Múltiplos hosts (-l): sc cp up -l <hosts...> <arquivo_local> [destino_remoto]
+	// - Múltiplos hosts (-l): sc cp up -l <hosts...|arquivo.txt> <arquivo_local> [destino_remoto]
 	// - Host único:           sc cp up <arquivo_local> [destino_remoto] <host>
 	if multipleHosts {
-		// Modo múltiplos hosts: hosts vêm primeiro, arquivo local por último
-		// Encontra o arquivo local (primeiro argumento que existe no filesystem)
-		localIdx := -1
-		for i := 0; i < len(args); i++ {
-			if _, err := os.Stat(args[i]); err == nil {
-				localIdx = i
-				break
-			}
-		}
-
-		if localIdx == -1 {
-			fmt.Fprintf(os.Stderr, "Erro: Nenhum arquivo local válido encontrado nos argumentos\n")
-			fmt.Fprintf(os.Stderr, "Uso: sc cp up -l <hosts...> <arquivo_local> [destino_remoto]\n")
-			os.Exit(1)
-		}
-
-		hostArgs = args[:localIdx]
-		localPath = args[localIdx]
-
-		if localIdx+1 < len(args) {
-			remotePath = args[localIdx+1]
-		} else {
-			remotePath = "~"
-		}
-
-		if len(hostArgs) == 0 {
-			fmt.Fprintf(os.Stderr, "Erro: Nenhum host especificado\n")
-			fmt.Fprintf(os.Stderr, "Uso: sc cp up -l <hosts...> <arquivo_local> [destino_remoto]\n")
+		hostArgs, localPath, remotePath, err = cmd.ParseMultipleUploadArgs(cfg, args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Uso: sc cp up -l <hosts...|arquivo.txt> <arquivo_local> [destino_remoto]\n")
 			os.Exit(1)
 		}
 	} else {
@@ -853,19 +850,6 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Erro: Arquivo local '%s' não encontrado\n", localPath)
 			os.Exit(1)
 		}
-	}
-
-	// Inicializa configuração
-	configPath, err := config.InitializeConfigDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Erro ao inicializar configuração: %v\n", err)
-		os.Exit(1)
-	}
-
-	cfg, err := config.LoadConfig(configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Erro ao carregar %s: %v\n", configPath, err)
-		os.Exit(1)
 	}
 
 	// Resolve o Jump Host se solicitado
