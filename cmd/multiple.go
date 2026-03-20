@@ -15,49 +15,14 @@ import (
 
 // HostResult armazena o resultado da execução em um host
 type HostResult struct {
-	Host           string
-	Success        bool
-	Output         string
-	Error          string
-	ExitCode       int
+	Host             string
+	Success          bool
+	Output           string
+	Error            string
+	ExitCode         int
 	ShouldAutoCreate bool   // Indica se o host deve ser auto-criado
-	Hostname       string // Hostname real para auto-criação
-	Port           int    // Porta para auto-criação
-}
-
-// expandTagsToHosts expande argumentos com @tag para lista de hosts
-// Retorna a lista expandida de hosts e as tags encontradas
-func expandTagsToHosts(cfg *config.ConfigFile, hostArgs []string) ([]string, []string) {
-	var expandedHosts []string
-	var tagsFound []string
-	hostSet := make(map[string]bool) // Para evitar duplicatas
-
-	for _, arg := range hostArgs {
-		if strings.HasPrefix(arg, "@") {
-			// É uma tag - expande para todos os hosts com essa tag
-			tag := strings.TrimPrefix(arg, "@")
-			tagsFound = append(tagsFound, tag)
-			hosts := cfg.FindHostsByTag(tag)
-			if len(hosts) == 0 {
-				fmt.Fprintf(os.Stderr, "⚠️  Aviso: Nenhum host encontrado com a tag '%s'\n", tag)
-				continue
-			}
-			for _, host := range hosts {
-				if !hostSet[host.Name] {
-					hostSet[host.Name] = true
-					expandedHosts = append(expandedHosts, host.Name)
-				}
-			}
-		} else {
-			// É um host normal
-			if !hostSet[arg] {
-				hostSet[arg] = true
-				expandedHosts = append(expandedHosts, arg)
-			}
-		}
-	}
-
-	return expandedHosts, tagsFound
+	Hostname         string // Hostname real para auto-criação
+	Port             int    // Porta para auto-criação
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
@@ -72,8 +37,12 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 	// Valida chaves SSH apenas do usuário efetivo
 	config.ValidateEffectiveUserSSHKeys(effectiveUser)
 
-	// Expande tags para hosts
-	expandedHosts, tagsFound := expandTagsToHosts(cfg, hostArgs)
+	// Expande tags e arquivos texto para hosts
+	expandedHosts, tagsFound, err := ResolveHostInputs(cfg, hostArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+		os.Exit(1)
+	}
 	if len(expandedHosts) == 0 {
 		fmt.Fprintf(os.Stderr, "Erro: Nenhum host válido especificado\n")
 		os.Exit(1)

@@ -456,10 +456,28 @@ func (ft *FileTransfer) uploadDirRecursive(sftpClient *sftp.Client, localPath, r
 
 // UploadMultiple envia arquivo para múltiplos hosts em paralelo
 func (ft *FileTransfer) UploadMultiple(cfg *config.ConfigFile, hostArgs []string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, askPassword bool) []TransferResult {
-	// Expande tags para hosts
-	expandedHosts, tagsFound := expandTagsToHosts(cfg, hostArgs)
+	// Expande tags e arquivos texto para hosts
+	expandedHosts, tagsFound, err := ResolveHostInputs(cfg, hostArgs)
+	if err != nil {
+		return []TransferResult{
+			{
+				Host:    "lista",
+				Success: false,
+				Error:   err.Error(),
+			},
+		}
+	}
 	if len(tagsFound) > 0 {
 		fmt.Printf("Tags: %s\n", strings.Join(tagsFound, ", "))
+	}
+	if len(expandedHosts) == 0 {
+		return []TransferResult{
+			{
+				Host:    "lista",
+				Success: false,
+				Error:   "nenhum host válido especificado",
+			},
+		}
 	}
 
 	results := make(chan TransferResult, len(expandedHosts))
