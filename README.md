@@ -15,7 +15,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 🔗 **Jump Hosts**: Suporte completo para conexões via bastion/jump hosts
 - 🏷️ **Tags para Hosts**: Agrupe hosts por tags e execute comandos em lote por grupo
 - 🌐 **Proxy Reverso**: Compartilhe proxy HTTP/HTTPS/FTP da máquina local com hosts remotos
-- 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente
+- 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente, usando hosts diretos, tags ou arquivos texto
 - 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
 - 🔑 **Auto-Instalação de Chaves**: Instala automaticamente sua chave pública no servidor após primeira conexão
 - 🔒 **Controle de Senha**: Flag `-a` para solicitar senha antecipadamente (ideal para automações)
@@ -189,12 +189,20 @@ sc -c "uptime" -l web1 web2 web3
 # Mistura de hosts e IPs
 sc -c "free -h" -l webserver 192.168.1.50 ubuntu@192.168.1.51
 
+# Lendo hosts de um arquivo texto
+sc -c "uptime" -l lista.txt
+
+# Combina arquivo, tags e hosts na mesma execução
+sc -c "hostname" -l lista.txt @web 10.10.10.10
+
 # Via jump host
 sc -j 1 -c "df -h" -l db1 db2 db3
 
 # Solicitando senha antecipadamente (útil para automações)
 sc -a -c "hostname" -l web1 web2 web3
 ```
+
+O arquivo informado em `-l` pode conter hosts separados por vírgula, ponto e vírgula ou um por linha. Também é possível misturar aliases do `config.yaml`, IPs, conexões diretas como `user@host:porta` e tags (`@tag`) no mesmo arquivo.
 
 **Usando Tags** (prefixo `@`):
 ```bash
@@ -252,6 +260,12 @@ sc cp up ./config.yaml /etc/app/ webserver
 
 # Envia para múltiplos hosts em paralelo
 sc cp up -l web1 web2 web3 ./script.sh /opt/scripts/ 
+
+# Envia usando arquivo texto com a lista de hosts
+sc cp up -l lista.txt ./script.sh /opt/scripts/
+
+# Combina arquivo, tags e hosts na mesma chamada
+sc cp up -l lista.txt @web app1 ./deploy.sh /opt/app/
 
 # Envia diretório recursivamente
 sc cp up -r ./dist/ /var/www/html/ webserver
