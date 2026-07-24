@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/alexeiev/sshControl/config"
-	"golang.org/x/term"
 )
 
 // Connect processa a conexão direta com um host
@@ -19,7 +18,7 @@ import (
 // 3. user@host: "ubuntu@192.168.1.50" (porta 22 por padrão)
 // 4. host:port: "192.168.1.50:22" (usa usuário especificado ou default)
 // 5. host: "192.168.1.50" (usa usuário especificado ou default e porta 22)
-func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, verbose bool) {
+func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, envPassword bool, verbose bool) {
 	var hostname string
 	var port int
 	var sshKeys []string
@@ -91,17 +90,11 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 		fmt.Fprintf(os.Stderr, "⚠️  Aviso: Proxy solicitado mas não configurado no config.yaml\n")
 	}
 
-	// Solicita senha antecipadamente se -a for especificado
-	password := ""
-	if askPassword {
-		fmt.Printf("Password for %s@%s: ", username, hostname)
-		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Println()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
-			os.Exit(1)
-		}
-		password = string(passwordBytes)
+	// Resolve a senha: -P lê da variável SCPW, -a solicita interativamente
+	password, err := ResolvePassword(askPassword, envPassword, fmt.Sprintf("Password for %s@%s: ", username, hostname))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Cria e executa a conexão SSH
@@ -121,7 +114,6 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 	)
 
 	// Decide se executa comando remoto ou inicia sessão interativa
-	var err error
 	if command != "" {
 		err = sshConn.ExecuteCommand()
 	} else {

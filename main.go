@@ -11,7 +11,6 @@ import (
 	"github.com/alexeiev/sshControl/config"
 	"github.com/alexeiev/sshControl/updater"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 var (
@@ -29,6 +28,7 @@ var (
 	showVersion   bool
 	proxyEnabled  bool
 	askPassword   bool
+	envPassword   bool
 	verbose       bool
 
 	// Flags do comando cp
@@ -283,6 +283,7 @@ CÓPIA DE ARQUIVOS (SFTP)
   -j, --jump <jump>   Usa jump host
   -u, --user <user>   Usa usuário específico
   -a, --ask-password  Solicita senha antes
+  -P, --env-password  Usa a senha da variável de ambiente SCPW
 
   Exemplos:
   sc cp down webserver /var/log/app.log ./
@@ -348,6 +349,7 @@ FLAGS DISPONÍVEIS
   -s, --servers             Lista servidores cadastrados
   -p, --proxy               Habilita proxy reverso
   -a, --ask-password        Solicita senha antes de conectar
+  -P, --env-password        Usa a senha da variável de ambiente SCPW
   -v, --verbose             Modo debug (informações detalhadas da conexão)
   -V, --version             Exibe versão
   -h, --help                Exibe ajuda
@@ -364,6 +366,14 @@ AUTENTICAÇÃO
   - Primeira conexão (antes de instalar chave)
   - Automações em múltiplos hosts
   - Servidores sem chave configurada
+
+  A flag -P usa a senha da variável de ambiente SCPW, sem prompt.
+  Útil para automações não interativas (CI/CD, scripts):
+    export SCPW='minha-senha'
+    sc -P -c "uptime" webserver
+    sc -P -c "df -h" -l @web
+  Tem precedência sobre -a. Se SCPW não estiver definida (ou vazia),
+  a execução é interrompida com erro.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -391,6 +401,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Exibe a versão do sshControl")
 	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
 	rootCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação (útil para automações)")
+	rootCmd.Flags().BoolVarP(&envPassword, "env-password", "P", false, "Usa a senha da variável de ambiente SCPW (sem prompt)")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
 
 	// Flags do comando cp (persistentes para down e up)
@@ -398,6 +409,7 @@ func init() {
 	cpCmd.PersistentFlags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
 	cpCmd.PersistentFlags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice)")
 	cpCmd.PersistentFlags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
+	cpCmd.PersistentFlags().BoolVarP(&envPassword, "env-password", "P", false, "Usa a senha da variável de ambiente SCPW (sem prompt)")
 	cpCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
 
 	// Flag específica do upload para múltiplos hosts
@@ -407,6 +419,7 @@ func init() {
 	pfCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
 	pfCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice)")
 	pfCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
+	pfCmd.Flags().BoolVarP(&envPassword, "env-password", "P", false, "Usa a senha da variável de ambiente SCPW (sem prompt)")
 	pfCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
 }
 
@@ -509,7 +522,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> ... | arquivo.txt\n")
 			os.Exit(1)
 		}
-		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, verbose)
+		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, envPassword, verbose)
 		showUpdateNotification(updateResultChan, version)
 		return
 	}
@@ -517,7 +530,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, verbose)
+		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, envPassword, verbose)
 		showUpdateNotification(updateResultChan, version)
 		return
 	}
@@ -751,17 +764,11 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(selectedJumpHost)
 	}
 
-	// Solicita senha se -a for especificado
-	password := ""
-	if askPassword {
-		fmt.Printf("Password for %s@%s: ", usernameToUse, hostname)
-		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Println()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
-			os.Exit(1)
-		}
-		password = string(passwordBytes)
+	// Resolve a senha: -P lê da variável SCPW, -a solicita interativamente
+	password, err := cmd.ResolvePassword(askPassword, envPassword, fmt.Sprintf("Password for %s@%s: ", usernameToUse, hostname))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Cria conexão SSH
@@ -891,17 +898,11 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 
 	// Modo múltiplos hosts
 	if multipleHosts || len(hostArgs) > 1 {
-		// Solicita senha antes se -a for especificado
-		password := ""
-		if askPassword {
-			fmt.Printf("Password for %s (será usada para todos os hosts): ", effectiveUser.Name)
-			passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-			fmt.Println()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
-				os.Exit(1)
-			}
-			password = string(passwordBytes)
+		// Resolve a senha: -P lê da variável SCPW, -a solicita interativamente
+		password, err := cmd.ResolvePassword(askPassword, envPassword, fmt.Sprintf("Password for %s (será usada para todos os hosts): ", effectiveUser.Name))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+			os.Exit(1)
 		}
 
 		fmt.Println()
@@ -961,17 +962,11 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(selectedJumpHost)
 	}
 
-	// Solicita senha se -a for especificado
-	password := ""
-	if askPassword {
-		fmt.Printf("Password for %s@%s: ", usernameToUse, hostname)
-		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Println()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
-			os.Exit(1)
-		}
-		password = string(passwordBytes)
+	// Resolve a senha: -P lê da variável SCPW, -a solicita interativamente
+	password, err := cmd.ResolvePassword(askPassword, envPassword, fmt.Sprintf("Password for %s@%s: ", usernameToUse, hostname))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Cria conexão SSH
@@ -1111,17 +1106,11 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 		jumpHostSSHKeys = cfg.GetJumpHostSSHKeys(selectedJumpHost)
 	}
 
-	// Solicita senha se -a for especificado
-	password := ""
-	if askPassword {
-		fmt.Printf("Password for %s@%s: ", usernameToUse, hostname)
-		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Println()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
-			os.Exit(1)
-		}
-		password = string(passwordBytes)
+	// Resolve a senha: -P lê da variável SCPW, -a solicita interativamente
+	password, err := cmd.ResolvePassword(askPassword, envPassword, fmt.Sprintf("Password for %s@%s: ", usernameToUse, hostname))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Cria conexão SSH

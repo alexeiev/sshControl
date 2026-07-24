@@ -10,7 +10,6 @@ import (
 
 	"github.com/alexeiev/sshControl/config"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term"
 )
 
 // HostResult armazena o resultado da execução em um host
@@ -26,7 +25,7 @@ type HostResult struct {
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
-func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, verbose bool) {
+func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, envPassword bool, verbose bool) {
 	// Determina o usuário efetivo
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
 	if effectiveUser == nil {
@@ -67,27 +66,32 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 	}
 	fmt.Println()
 
-	// Em modo múltiplos hosts, solicita senha apenas se -a for especificado
-	// Isso evita interrupção em automações/loops
+	// Em modo múltiplos hosts, resolve a senha uma única vez.
+	// -P lê da variável de ambiente SCPW; -a solicita interativamente.
+	// Isso evita interrupção em automações/loops.
 	password := ""
-	if askPassword {
-		// Flag -a foi especificada, solicita senha antecipadamente
+	if askPassword || envPassword {
+		// Define o prompt conforme o usuário tenha ou não chave configurada
+		var prompt string
 		if len(effectiveUser.SSHKeys) == 0 {
 			// Usuário sem chave configurada - senha é obrigatória
-			fmt.Printf("Password for %s (será usada para todos os hosts): ", effectiveUser.Name)
+			prompt = fmt.Sprintf("Password for %s (será usada para todos os hosts): ", effectiveUser.Name)
 		} else {
 			// Usuário com chave configurada - senha como fallback
-			fmt.Printf("Password for %s (fallback caso chave SSH falhe, Enter para pular): ", effectiveUser.Name)
+			prompt = fmt.Sprintf("Password for %s (fallback caso chave SSH falhe, Enter para pular): ", effectiveUser.Name)
 		}
 
-		passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Println()
+		pw, err := ResolvePassword(askPassword, envPassword, prompt)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao ler senha: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
 			os.Exit(1)
 		}
-		password = string(passwordBytes)
-		fmt.Println()
+		password = pw
+
+		// Espaçamento extra após o prompt interativo
+		if askPassword && !envPassword {
+			fmt.Println()
+		}
 	}
 
 	// Captura o tempo de início

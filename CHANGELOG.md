@@ -5,6 +5,17 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.9.0] - 2026-07-24
+
+### Added
+
+- **Senha via variável de ambiente (`-P, --env-password`)**: Nova flag para fornecer a senha SSH através da variável de ambiente `SCPW`, sem prompt interativo
+  - Ideal para automações não interativas (CI/CD, scripts): `export SCPW='senha'` seguido de `sc -P -c "uptime" webserver`
+  - Tem precedência sobre `-a, --ask-password`
+  - Interrompe a execução com erro claro quando `SCPW` não está definida ou está vazia
+  - Disponível em todos os modos: conexão direta, comando único, múltiplos hosts (`-l`), SFTP (`sc cp up`/`sc cp down`) e port forward
+- Novo arquivo `cmd/password.go` com a função compartilhada `ResolvePassword` que centraliza a resolução de senha (variável `SCPW` → prompt `-a` → vazia)
+
 ## [0.8.0] - 2026-03-20
 
 ### Added
@@ -250,7 +261,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/alexeiev/sshControl/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/alexeiev/sshControl/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alexeiev/sshControl/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/alexeiev/sshControl/compare/v0.5.2...v0.6.0
