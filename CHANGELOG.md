@@ -15,6 +15,17 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Interrompe a execução com erro claro quando `SCPW` não está definida ou está vazia
   - Disponível em todos os modos: conexão direta, comando único, múltiplos hosts (`-l`), SFTP (`sc cp up`/`sc cp down`) e port forward
 - Novo arquivo `cmd/password.go` com a função compartilhada `ResolvePassword` que centraliza a resolução de senha (variável `SCPW` → prompt `-a` → vazia)
+- **Seleção de usuário por índice na opção `-u`**: Além do nome, a flag `-u` agora aceita o índice (1-based) do usuário cadastrado no `config.yaml`, seguindo o mesmo padrão já existente para jump hosts (`-j`)
+  - Ex.: `sc -u1 webserver` usa o primeiro usuário da lista; `sc -u 2 webserver` usa o segundo
+  - Mensagem de erro para usuário inválido agora lista os usuários disponíveis com seus índices
+  - Novas funções `GetUserByIndex` e `ResolveUser` no pacote `config` (nome ou índice)
+- **Listagem de usuários no `sc -s`**:
+  - `sc -s` (sem filtro) agora lista também os usuários cadastrados com seus índices, além de jump hosts e servidores
+  - Novo filtro especial `sc -s @users` (ou `@user`) exibe apenas os usuários com seus índices
+
+### Changed
+
+- **Resolução de índice mais estrita para `-u` e `-j`**: um identificador só é tratado como índice quando é inteiramente numérico (`strconv.Atoi`); qualquer valor com letras (ex.: `2fa`) passa a ser resolvido por nome. Antes, o parsing por `fmt.Sscanf` aceitava o prefixo numérico e podia interpretar `2fa` como índice `2`
 
 ## [0.8.0] - 2026-03-20
 
