@@ -235,10 +235,48 @@ func ParseConnectionString(input string) (user, host string, port int, err error
 	return h.parsedUser, h.hostname, h.port, nil
 }
 
+// printUsers exibe os usuários cadastrados com seus índices (1-based)
+func printUsers(cfg *config.ConfigFile) {
+	if len(cfg.Config.User) == 0 {
+		fmt.Println("ℹ️  Nenhum usuário cadastrado no config.yaml")
+		fmt.Println()
+		return
+	}
+
+	fmt.Println("👤 Usuários cadastrados:")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("%-5s %-20s %s\n", "Idx", "Nome", "Chaves SSH")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	for i, u := range cfg.Config.User {
+		keys := "-"
+		if len(u.SSHKeys) > 0 {
+			keys = strings.Join(u.SSHKeys, ", ")
+		}
+		fmt.Printf("%-5d %-20s %s\n", i+1, u.Name, keys)
+	}
+
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("Total: %d usuário(s)\n", len(cfg.Config.User))
+	fmt.Println()
+}
+
+// ListUsers exibe apenas os usuários cadastrados com seus índices
+// Usado pelo filtro especial 'sc -s @users' / 'sc -s @user'
+func ListUsers(cfg *config.ConfigFile) {
+	fmt.Println()
+	printUsers(cfg)
+}
+
 // ListServers exibe todos os servidores e jump hosts cadastrados no config
 // Se tagFilter não estiver vazio, filtra os servidores pela tag especificada
 func ListServers(cfg *config.ConfigFile, tagFilter string) {
 	fmt.Println()
+
+	// Sem filtro de tag: exibe também os usuários cadastrados
+	if tagFilter == "" {
+		printUsers(cfg)
+	}
 
 	// Exibe Jump Hosts se houver algum (sempre mostra, independente do filtro)
 	if len(cfg.Config.JumpHosts) > 0 {

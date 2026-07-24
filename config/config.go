@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -96,6 +97,31 @@ func (c *ConfigFile) FindUser(name string) *User {
 		}
 	}
 	return nil
+}
+
+// GetUserByIndex retorna um usuário pelo índice (1-based)
+func (c *ConfigFile) GetUserByIndex(index int) *User {
+	if index < 1 || index > len(c.Config.User) {
+		return nil
+	}
+	return &c.Config.User[index-1]
+}
+
+// ResolveUser resolve um usuário por nome ou índice
+// Aceita: "ubuntu" ou "1", "2", etc.
+// Só trata como índice se a string for inteiramente numérica; caso contrário, busca por nome
+func (c *ConfigFile) ResolveUser(identifier string) *User {
+	if identifier == "" {
+		return nil
+	}
+
+	// Só é índice se a string inteira for um número
+	if index, err := strconv.Atoi(identifier); err == nil {
+		return c.GetUserByIndex(index)
+	}
+
+	// Não é número, busca por nome
+	return c.FindUser(identifier)
 }
 
 // GetProxyConfig retorna a configuração de proxy validada
@@ -295,16 +321,14 @@ func (c *ConfigFile) GetJumpHostByIndex(index int) *JumpHost {
 
 // ResolveJumpHost resolve um jump host por nome ou índice
 // Aceita: "jumpname" ou "1", "2", etc.
+// Só trata como índice se a string for inteiramente numérica; caso contrário, busca por nome
 func (c *ConfigFile) ResolveJumpHost(identifier string) *JumpHost {
 	if identifier == "" {
 		return nil
 	}
 
-	// Tenta parsear como número
-	var index int
-	_, err := fmt.Sscanf(identifier, "%d", &index)
-	if err == nil {
-		// É um número, busca por índice
+	// Só é índice se a string inteira for um número
+	if index, err := strconv.Atoi(identifier); err == nil {
 		return c.GetJumpHostByIndex(index)
 	}
 

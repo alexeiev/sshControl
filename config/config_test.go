@@ -35,6 +35,63 @@ func TestApplyDefaultsAndEffectiveUser(t *testing.T) {
 	}
 }
 
+func TestResolveUser(t *testing.T) {
+	t.Parallel()
+
+	cfg := &ConfigFile{
+		Config: Config{
+			User: []User{
+				{Name: "ubuntu", SSHKeys: []string{"~/.ssh/id_rsa"}},
+				{Name: "devops", SSHKeys: []string{"~/.ssh/deploy_id"}},
+				{Name: "root"},
+				{Name: "2fa", SSHKeys: []string{"~/.ssh/id_rsa"}},
+			},
+		},
+	}
+
+	// Por índice (1-based)
+	if got := cfg.ResolveUser("1"); got == nil || got.Name != "ubuntu" {
+		t.Fatalf("ResolveUser(\"1\") = %+v, want ubuntu", got)
+	}
+	if got := cfg.ResolveUser("3"); got == nil || got.Name != "root" {
+		t.Fatalf("ResolveUser(\"3\") = %+v, want root", got)
+	}
+
+	// Por nome
+	if got := cfg.ResolveUser("devops"); got == nil || got.Name != "devops" {
+		t.Fatalf("ResolveUser(\"devops\") = %+v, want devops", got)
+	}
+
+	// Índice fora do intervalo
+	if got := cfg.ResolveUser("0"); got != nil {
+		t.Fatalf("ResolveUser(\"0\") = %+v, want nil", got)
+	}
+	if got := cfg.ResolveUser("5"); got != nil {
+		t.Fatalf("ResolveUser(\"5\") = %+v, want nil", got)
+	}
+
+	// Nome alfanumérico que começa com dígito NÃO é índice: deve buscar por nome
+	if got := cfg.ResolveUser("2fa"); got == nil || got.Name != "2fa" {
+		t.Fatalf("ResolveUser(\"2fa\") = %+v, want usuário 2fa (nome, não índice)", got)
+	}
+
+	// Nome inexistente e string vazia
+	if got := cfg.ResolveUser("missing"); got != nil {
+		t.Fatalf("ResolveUser(\"missing\") = %+v, want nil", got)
+	}
+	if got := cfg.ResolveUser(""); got != nil {
+		t.Fatalf("ResolveUser(\"\") = %+v, want nil", got)
+	}
+
+	// GetUserByIndex direto
+	if got := cfg.GetUserByIndex(2); got == nil || got.Name != "devops" {
+		t.Fatalf("GetUserByIndex(2) = %+v, want devops", got)
+	}
+	if got := cfg.GetUserByIndex(99); got != nil {
+		t.Fatalf("GetUserByIndex(99) = %+v, want nil", got)
+	}
+}
+
 func TestResolveJumpHostAndGetHostsForTUI(t *testing.T) {
 	t.Parallel()
 

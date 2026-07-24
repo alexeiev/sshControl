@@ -50,8 +50,10 @@ Para ver exemplos de uso e manual completo, execute: sc man`,
   sc -c "comando" <host>       # Executa comando remoto
   sc -c "comando" -l <hosts>   # Executa em múltiplos hosts
   sc -c "comando" -l lista.txt # Lê hosts de um arquivo texto
-  sc -s                        # Lista servidores cadastrados
+  sc -s                        # Lista usuários, jump hosts e servidores
   sc -s @tag                   # Lista servidores filtrados por tag
+  sc -s @users                 # Lista apenas os usuários com seus índices
+  sc -u1 <host>                # Usa o usuário de índice 1 do config
   sc man                       # Exibe manual completo com exemplos`,
 	Args: cobra.ArbitraryArgs,
 	Run:  runCommand,
@@ -193,7 +195,7 @@ CONFIGURAÇÃO
 
 MODO INTERATIVO (TUI)
   sc                        Abre menu interativo para selecionar host
-  sc -u <usuario>           Menu com usuário específico
+  sc -u <usuario>           Menu com usuário específico (nome ou índice, ex: -u1)
   sc -j <jump>              Menu via jump host
   sc -p                     Menu com proxy reverso habilitado
 
@@ -330,8 +332,9 @@ PORT FORWARD (Túnel SSH)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 COMANDOS ÚTEIS
-  sc -s                     Lista servidores e jump hosts cadastrados
+  sc -s                     Lista usuários, jump hosts e servidores cadastrados
   sc -s @tag                Lista servidores filtrados por tag
+  sc -s @users              Lista apenas os usuários com seus índices
   sc -V, sc --version       Exibe versão do sshControl
   sc update                 Atualiza para versão mais recente
   sc cp                     Copia arquivos via SFTP (veja sc cp --help)
@@ -342,11 +345,11 @@ COMANDOS ÚTEIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 FLAGS DISPONÍVEIS
-  -u, --user <usuario>      Usuário SSH a ser usado
+  -u, --user <usuario>      Usuário SSH a ser usado (nome ou índice, ex: ubuntu ou 1)
   -j, --jump <jump>         Jump host (nome ou índice)
   -c, --command <comando>   Comando a executar remotamente
   -l, --list                Modo múltiplos hosts (requer -c)
-  -s, --servers             Lista servidores cadastrados
+  -s, --servers             Lista usuários, jump hosts e servidores (use @tag ou @users)
   -p, --proxy               Habilita proxy reverso
   -a, --ask-password        Solicita senha antes de conectar
   -P, --env-password        Usa a senha da variável de ambiente SCPW
@@ -393,11 +396,11 @@ func init() {
 	cpCmd.AddCommand(cpDownCmd)
 	cpCmd.AddCommand(cpUpCmd)
 
-	rootCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
+	rootCmd.Flags().StringVarP(&username, "user", "u", "", "Usuário da configuração a ser usado (nome ou índice, ex: ubuntu ou 1)")
 	rootCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice, ex: production-jump ou 1)")
 	rootCmd.Flags().StringVarP(&command, "command", "c", "", "Comando a ser executado remotamente")
 	rootCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Executa comando em múltiplos hosts (aceita hosts, tags e arquivo texto)")
-	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista servidores (use 'sc -s @tag' para filtrar por tag)")
+	rootCmd.Flags().BoolVarP(&showServers, "servers", "s", false, "Lista usuários, jump hosts e servidores (use '@tag' para filtrar ou '@users' para só usuários)")
 	rootCmd.Flags().BoolVarP(&showVersion, "version", "V", false, "Exibe a versão do sshControl")
 	rootCmd.Flags().BoolVarP(&proxyEnabled, "proxy", "p", false, "Habilita tunnel SSH reverso para compartilhar proxy")
 	rootCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação (útil para automações)")
@@ -406,7 +409,7 @@ func init() {
 
 	// Flags do comando cp (persistentes para down e up)
 	cpCmd.PersistentFlags().BoolVarP(&cpRecursive, "recursive", "r", false, "Copia diretórios recursivamente")
-	cpCmd.PersistentFlags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
+	cpCmd.PersistentFlags().StringVarP(&username, "user", "u", "", "Usuário da configuração a ser usado (nome ou índice)")
 	cpCmd.PersistentFlags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice)")
 	cpCmd.PersistentFlags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
 	cpCmd.PersistentFlags().BoolVarP(&envPassword, "env-password", "P", false, "Usa a senha da variável de ambiente SCPW (sem prompt)")
@@ -416,7 +419,7 @@ func init() {
 	cpUpCmd.Flags().BoolVarP(&multipleHosts, "list", "l", false, "Envia para múltiplos hosts em paralelo (aceita arquivo texto)")
 
 	// Flags do comando port-forward
-	pfCmd.Flags().StringVarP(&username, "user", "u", "", "Nome do usuário da configuração a ser usado")
+	pfCmd.Flags().StringVarP(&username, "user", "u", "", "Usuário da configuração a ser usado (nome ou índice)")
 	pfCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar (nome ou índice)")
 	pfCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
 	pfCmd.Flags().BoolVarP(&envPassword, "env-password", "P", false, "Usa a senha da variável de ambiente SCPW (sem prompt)")
@@ -463,6 +466,11 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 				os.Exit(1)
 			}
 		}
+		// Filtro especial: @users / @user lista apenas os usuários com seus índices
+		if tagFilter == "users" || tagFilter == "user" {
+			cmd.ListUsers(cfg)
+			return
+		}
 		cmd.ListServers(cfg, tagFilter)
 		return
 	}
@@ -491,18 +499,14 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	// Valida e aplica o usuário se especificado
 	var selectedUser *config.User
 	if username != "" {
-		selectedUser = cfg.FindUser(username)
+		selectedUser = cfg.ResolveUser(username)
 		if selectedUser == nil {
 			fmt.Fprintf(os.Stderr, "Erro: Usuário '%s' não encontrado no config.yaml\n", username)
 			if len(cfg.Config.User) > 0 {
-				fmt.Fprintf(os.Stderr, "Usuários disponíveis: ")
+				fmt.Fprintf(os.Stderr, "Usuários disponíveis (use nome ou índice):\n")
 				for i, u := range cfg.Config.User {
-					if i > 0 {
-						fmt.Fprintf(os.Stderr, ", ")
-					}
-					fmt.Fprintf(os.Stderr, "%s", u.Name)
+					fmt.Fprintf(os.Stderr, "  %d. %s\n", i+1, u.Name)
 				}
-				fmt.Fprintf(os.Stderr, "\n")
 			}
 			os.Exit(1)
 		}
@@ -708,7 +712,7 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 	// Valida e aplica o usuário
 	var selectedUser *config.User
 	if username != "" {
-		selectedUser = cfg.FindUser(username)
+		selectedUser = cfg.ResolveUser(username)
 		if selectedUser == nil {
 			fmt.Fprintf(os.Stderr, "Erro: Usuário '%s' não encontrado no config.yaml\n", username)
 			os.Exit(1)
@@ -872,7 +876,7 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 	// Valida e aplica o usuário
 	var selectedUser *config.User
 	if username != "" {
-		selectedUser = cfg.FindUser(username)
+		selectedUser = cfg.ResolveUser(username)
 		if selectedUser == nil {
 			fmt.Fprintf(os.Stderr, "Erro: Usuário '%s' não encontrado no config.yaml\n", username)
 			os.Exit(1)
@@ -1050,7 +1054,7 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 	// Valida e aplica o usuário
 	var selectedUser *config.User
 	if username != "" {
-		selectedUser = cfg.FindUser(username)
+		selectedUser = cfg.ResolveUser(username)
 		if selectedUser == nil {
 			fmt.Fprintf(os.Stderr, "Erro: Usuário '%s' não encontrado no config.yaml\n", username)
 			os.Exit(1)
