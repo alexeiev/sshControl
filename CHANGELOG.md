@@ -5,6 +5,17 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Changed
+
+- **Múltiplas tags passam a filtrar por interseção (AND)**: ao informar mais de uma tag, apenas os hosts que possuem **todas** as tags são selecionados (antes era feita a união)
+  - `sc -s @web @production` lista somente os servidores com as duas tags
+  - Vale também para execução remota (`sc -c "..." -l @web @production`), upload (`sc cp up -l`) e tags dentro de arquivos de lista
+  - Hosts informados diretamente (nome, IP ou `user@host:porta`) continuam sendo sempre incluídos
+  - Filtro da TUI combina múltiplos termos separados por espaço; termos `@tag` exigem a tag exata
+- Novas funções `FindHostsByTags` e `HasAllTags` no pacote `config`
+
 ## [0.9.0] - 2026-07-24
 
 ### Added

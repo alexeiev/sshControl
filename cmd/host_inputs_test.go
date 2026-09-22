@@ -127,3 +127,30 @@ func TestParseMultipleUploadArgsWithMultipleHostFiles(t *testing.T) {
 		t.Fatalf("remotePath incorreto: got=%s want=%s", remotePath, "~")
 	}
 }
+
+func TestResolveHostInputsFromFileWithMultipleTags(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.ConfigFile{
+		Hosts: []config.Host{
+			{Name: "web1", Host: "10.0.0.1", Port: 22, Tags: []string{"web", "prod"}},
+			{Name: "web2", Host: "10.0.0.2", Port: 22, Tags: []string{"web"}},
+		},
+	}
+
+	tempDir := t.TempDir()
+	listPath := filepath.Join(tempDir, "lista.txt")
+	if err := os.WriteFile(listPath, []byte("@web\n@prod\n"), 0644); err != nil {
+		t.Fatalf("falha ao criar lista: %v", err)
+	}
+
+	gotHosts, _, err := ResolveHostInputs(cfg, []string{listPath})
+	if err != nil {
+		t.Fatalf("ResolveHostInputs retornou erro: %v", err)
+	}
+
+	wantHosts := []string{"web1"}
+	if !reflect.DeepEqual(gotHosts, wantHosts) {
+		t.Fatalf("hosts incorretos: got=%v want=%v", gotHosts, wantHosts)
+	}
+}
