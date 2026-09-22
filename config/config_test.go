@@ -154,3 +154,41 @@ func TestValidateSSHKeyPairs(t *testing.T) {
 		t.Fatalf("ValidateSSHKeyPairs() returned %d warnings, want 2: %v", len(warnings), warnings)
 	}
 }
+
+func TestFindHostsByTags(t *testing.T) {
+	t.Parallel()
+
+	cfg := &ConfigFile{
+		Hosts: []Host{
+			{Name: "web-1", Tags: []string{"web", "prod"}},
+			{Name: "web-2", Tags: []string{"web", "staging"}},
+			{Name: "db-1", Tags: []string{"db", "PROD"}},
+		},
+	}
+
+	names := func(hosts []Host) []string {
+		var out []string
+		for _, h := range hosts {
+			out = append(out, h.Name)
+		}
+		return out
+	}
+
+	tests := []struct {
+		tags []string
+		want []string
+	}{
+		{[]string{"web"}, []string{"web-1", "web-2"}},
+		{[]string{"prod"}, []string{"web-1", "db-1"}},
+		{[]string{"web", "prod"}, []string{"web-1"}},
+		{[]string{"Web", "Staging"}, []string{"web-2"}},
+		{[]string{"web", "db"}, nil},
+		{nil, nil},
+	}
+
+	for _, tt := range tests {
+		if got := names(cfg.FindHostsByTags(tt.tags)); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("FindHostsByTags(%v) = %v, want %v", tt.tags, got, tt.want)
+		}
+	}
+}

@@ -269,12 +269,12 @@ func ListUsers(cfg *config.ConfigFile) {
 }
 
 // ListServers exibe todos os servidores e jump hosts cadastrados no config
-// Se tagFilter não estiver vazio, filtra os servidores pela tag especificada
-func ListServers(cfg *config.ConfigFile, tagFilter string) {
+// Se tagFilters não estiver vazio, exibe apenas os servidores que possuem TODAS as tags
+func ListServers(cfg *config.ConfigFile, tagFilters []string) {
 	fmt.Println()
 
 	// Sem filtro de tag: exibe também os usuários cadastrados
-	if tagFilter == "" {
+	if len(tagFilters) == 0 {
 		printUsers(cfg)
 	}
 
@@ -300,16 +300,16 @@ func ListServers(cfg *config.ConfigFile, tagFilter string) {
 
 	// Filtra servidores por tag se especificado
 	var hostsToShow []config.Host
-	if tagFilter != "" {
-		hostsToShow = cfg.FindHostsByTag(tagFilter)
+	if len(tagFilters) > 0 {
+		hostsToShow = cfg.FindHostsByTags(tagFilters)
 	} else {
 		hostsToShow = cfg.Hosts
 	}
 
 	// Exibe Servidores
 	if len(hostsToShow) == 0 {
-		if tagFilter != "" {
-			fmt.Printf("ℹ️  Nenhum servidor encontrado com a tag '%s'\n", tagFilter)
+		if len(tagFilters) > 0 {
+			fmt.Printf("ℹ️  %s\n", noHostsForTagsMessage(tagFilters))
 		} else {
 			fmt.Println("ℹ️  Nenhum servidor cadastrado no config.yaml")
 		}
@@ -317,8 +317,10 @@ func ListServers(cfg *config.ConfigFile, tagFilter string) {
 		return
 	}
 
-	if tagFilter != "" {
-		fmt.Printf("📋 Servidores com tag '%s':\n", tagFilter)
+	if len(tagFilters) == 1 {
+		fmt.Printf("📋 Servidores com tag '%s':\n", tagFilters[0])
+	} else if len(tagFilters) > 1 {
+		fmt.Printf("📋 Servidores com as tags '%s':\n", strings.Join(tagFilters, "' + '"))
 	} else {
 		fmt.Println("📋 Servidores cadastrados:")
 	}

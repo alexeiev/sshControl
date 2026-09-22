@@ -12,6 +12,8 @@ import (
 var hostListEntryPattern = regexp.MustCompile(`^(?:[^@\s/:]+@)?[A-Za-z0-9._-]+(?::\d+)?$`)
 
 // ResolveHostInputs expande entradas de host para aceitar hosts diretos, tags e arquivos texto.
+// Quando mais de uma tag é informada, apenas os hosts que possuem TODAS as tags são incluídos (interseção).
+// Hosts informados diretamente são sempre incluídos.
 func ResolveHostInputs(cfg *config.ConfigFile, hostArgs []string) ([]string, []string, error) {
 	var expandedHosts []string
 	var tagsFound []string
@@ -19,13 +21,47 @@ func ResolveHostInputs(cfg *config.ConfigFile, hostArgs []string) ([]string, []s
 	hostSet := make(map[string]bool)
 	tagSet := make(map[string]bool)
 
+	// Posição em expandedHosts onde os hosts das tags serão inseridos (-1 = nenhuma tag)
+	tagInsertPos := -1
+
 	for _, arg := range hostArgs {
-		if err := appendHostInput(cfg, strings.TrimSpace(arg), true, hostSet, tagSet, &expandedHosts, &tagsFound); err != nil {
+		if err := appendHostInput(cfg, strings.TrimSpace(arg), true, hostSet, tagSet, &expandedHosts, &tagsFound, &tagInsertPos); err != nil {
 			return nil, nil, err
 		}
 	}
 
-	return expandedHosts, tagsFound, nil
+	if len(tagsFound) == 0 {
+		return expandedHosts, tagsFound, nil
+	}
+
+	tagHosts := cfg.FindHostsByTags(tagsFound)
+	if len(tagHosts) == 0 {
+		fmt.Fprintf(os.Stderr, "⚠️  Aviso: %s\n", noHostsForTagsMessage(tagsFound))
+		return expandedHosts, tagsFound, nil
+	}
+
+	var tagHostNames []string
+	for _, host := range tagHosts {
+		if !hostSet[host.Name] {
+			hostSet[host.Name] = true
+			tagHostNames = append(tagHostNames, host.Name)
+		}
+	}
+
+	result := make([]string, 0, len(expandedHosts)+len(tagHostNames))
+	result = append(result, expandedHosts[:tagInsertPos]...)
+	result = append(result, tagHostNames...)
+	result = append(result, expandedHosts[tagInsertPos:]...)
+
+	return result, tagsFound, nil
+}
+
+// noHostsForTagsMessage monta a mensagem de aviso quando nenhum host possui as tags informadas
+func noHostsForTagsMessage(tags []string) string {
+	if len(tags) == 1 {
+		return fmt.Sprintf("Nenhum host encontrado com a tag '%s'", tags[0])
+	}
+	return fmt.Sprintf("Nenhum host encontrado com todas as tags '%s'", strings.Join(tags, "', '"))
 }
 
 // ParseMultipleUploadArgs identifica os hosts, o arquivo local e o destino remoto no modo `cp up -l`.
@@ -90,7 +126,7 @@ func IsHostListFile(cfg *config.ConfigFile, path string) bool {
 	return true
 }
 
-func appendHostInput(cfg *config.ConfigFile, arg string, allowFile bool, hostSet map[string]bool, tagSet map[string]bool, expandedHosts *[]string, tagsFound *[]string) error {
+func appendHostInput(cfg *config.ConfigFile, arg string, allowFile bool, hostSet map[string]bool, tagSet map[string]bool, expandedHosts *[]string, tagsFound *[]string, tagInsertPos *int) error {
 	if arg == "" {
 		return nil
 	}
@@ -102,35 +138,28 @@ func appendHostInput(cfg *config.ConfigFile, arg string, allowFile bool, hostSet
 		}
 
 		for _, fileHost := range fileHosts {
-			if err := appendHostInput(cfg, fileHost, false, hostSet, tagSet, expandedHosts, tagsFound); err != nil {
+			if err := appendHostInput(cfg, fileHost, false, hostSet, tagSet, expandedHosts, tagsFound, tagInsertPos); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
 
+	// Tags são apenas coletadas aqui; a interseção é resolvida em ResolveHostInputs
 	if strings.HasPrefix(arg, "@") {
 		tag := strings.TrimPrefix(arg, "@")
 		if tag == "" {
 			return nil
 		}
 
-		if !tagSet[tag] {
-			tagSet[tag] = true
+		if *tagInsertPos < 0 {
+			*tagInsertPos = len(*expandedHosts)
+		}
+
+		tagKey := strings.ToLower(tag)
+		if !tagSet[tagKey] {
+			tagSet[tagKey] = true
 			*tagsFound = append(*tagsFound, tag)
-		}
-
-		hosts := cfg.FindHostsByTag(tag)
-		if len(hosts) == 0 {
-			fmt.Fprintf(os.Stderr, "⚠️  Aviso: Nenhum host encontrado com a tag '%s'\n", tag)
-			return nil
-		}
-
-		for _, host := range hosts {
-			if !hostSet[host.Name] {
-				hostSet[host.Name] = true
-				*expandedHosts = append(*expandedHosts, host.Name)
-			}
 		}
 		return nil
 	}

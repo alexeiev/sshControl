@@ -308,19 +308,38 @@ func (m model) View() string {
 }
 
 // applyFilter filtra os items baseado no texto digitado
+// Termos separados por espaço são combinados (todos devem coincidir).
+// Termos com '@' (ex: @web @prod) exigem que o host possua exatamente aquela tag.
 func (m *model) applyFilter() {
-	filterText := strings.ToLower(m.filter.Value())
-	if filterText == "" {
+	terms := strings.Fields(strings.ToLower(m.filter.Value()))
+	if len(terms) == 0 {
 		m.list.SetItems(m.allItems)
 		return
 	}
 
 	var filtered []list.Item
 	for _, item := range m.allItems {
-		if strings.Contains(strings.ToLower(item.FilterValue()), filterText) {
+		if hostMatchesFilter(item.(hostItem), terms) {
 			filtered = append(filtered, item)
 		}
 	}
 
 	m.list.SetItems(filtered)
+}
+
+// hostMatchesFilter verifica se o host atende a todos os termos do filtro
+func hostMatchesFilter(item hostItem, terms []string) bool {
+	filterValue := strings.ToLower(item.FilterValue())
+	for _, term := range terms {
+		if tag := strings.TrimPrefix(term, "@"); tag != term {
+			if tag != "" && !item.host.HasTag(tag) {
+				return false
+			}
+			continue
+		}
+		if !strings.Contains(filterValue, term) {
+			return false
+		}
+	}
+	return true
 }

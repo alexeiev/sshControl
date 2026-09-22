@@ -52,6 +52,7 @@ Para ver exemplos de uso e manual completo, execute: sc man`,
   sc -c "comando" -l lista.txt # Lê hosts de um arquivo texto
   sc -s                        # Lista usuários, jump hosts e servidores
   sc -s @tag                   # Lista servidores filtrados por tag
+  sc -s @tag1 @tag2            # Lista servidores que possuem todas as tags
   sc -s @users                 # Lista apenas os usuários com seus índices
   sc -u1 <host>                # Usa o usuário de índice 1 do config
   sc man                       # Exibe manual completo com exemplos`,
@@ -245,14 +246,18 @@ TAGS (Agrupamento de Hosts)
 
   Use @tag para executar em todos os hosts de uma tag:
   sc -c "uptime" -l @web                  Todos os hosts com tag "web"
-  sc -c "df -h" -l @web @db               Múltiplas tags
+  sc -c "df -h" -l @web @production      Hosts com AMBAS as tags (interseção)
   sc -c "hostname" -l @production server1 Combina tag e host
+
+  Ao informar mais de uma tag, apenas os hosts que possuem TODAS as tags
+  são selecionados. Hosts informados diretamente são sempre incluídos.
 
   Também é possível informar um arquivo texto em -l:
   sc -c "uptime" -l lista.txt             Um host por linha, ou separados por , e ;
   sc -c "uptime" -l @web lista.txt        Combina tags, hosts e arquivo
 
   Na TUI, digite "/" e busque pelo nome da tag para filtrar.
+  Vários termos combinam entre si (ex: "@web @production").
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -334,6 +339,7 @@ PORT FORWARD (Túnel SSH)
 COMANDOS ÚTEIS
   sc -s                     Lista usuários, jump hosts e servidores cadastrados
   sc -s @tag                Lista servidores filtrados por tag
+  sc -s @tag1 @tag2         Lista servidores que possuem todas as tags
   sc -s @users              Lista apenas os usuários com seus índices
   sc -V, sc --version       Exibe versão do sshControl
   sc update                 Atualiza para versão mais recente
@@ -455,23 +461,22 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 
 	// Se a flag -s foi usada, lista os servidores e sai
 	// Se houver um argumento adicional com @tag, usa como filtro de tag
+	// Múltiplas tags (ex: sc -s @web @prod) filtram hosts que possuem TODAS as tags
 	if showServers {
-		tagFilter := ""
-		if len(args) > 0 {
-			arg := args[0]
-			if strings.HasPrefix(arg, "@") {
-				tagFilter = strings.TrimPrefix(arg, "@")
-			} else {
-				fmt.Fprintf(os.Stderr, "Erro: Use @tag para filtrar por tag (ex: sc -s @%s)\n", arg)
+		var tagFilters []string
+		for _, arg := range args {
+			if !strings.HasPrefix(arg, "@") || len(arg) == 1 {
+				fmt.Fprintf(os.Stderr, "Erro: Use @tag para filtrar por tag (ex: sc -s @%s)\n", strings.TrimPrefix(arg, "@"))
 				os.Exit(1)
 			}
+			tagFilters = append(tagFilters, strings.TrimPrefix(arg, "@"))
 		}
 		// Filtro especial: @users / @user lista apenas os usuários com seus índices
-		if tagFilter == "users" || tagFilter == "user" {
+		if len(tagFilters) == 1 && (tagFilters[0] == "users" || tagFilters[0] == "user") {
 			cmd.ListUsers(cfg)
 			return
 		}
-		cmd.ListServers(cfg, tagFilter)
+		cmd.ListServers(cfg, tagFilters)
 		return
 	}
 

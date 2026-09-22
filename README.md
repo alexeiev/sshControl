@@ -209,8 +209,8 @@ O arquivo informado em `-l` pode conter hosts separados por vírgula, ponto e v�
 # Executar em todos os hosts com tag "web"
 sc -c "uptime" -l @web
 
-# Executar em múltiplas tags
-sc -c "df -h" -l @web @db
+# Executar apenas nos hosts que possuem TODAS as tags (interseção)
+sc -c "df -h" -l @web @production
 
 # Combinar tags com hosts específicos
 sc -c "hostname" -l @production server1 192.168.1.100
@@ -333,6 +333,7 @@ sc -s
 # Listar servidores filtrados por tag
 sc -s @ansible
 sc -s @production
+sc -s @web @production   # hosts com as duas tags
 
 # Verificar versão
 sc -V
@@ -445,8 +446,8 @@ hosts:
 # Executar em todos os hosts com tag "web"
 sc -c "nginx -t" -l @web
 
-# Executar em múltiplas tags (união de hosts)
-sc -c "df -h" -l @web @db
+# Executar apenas nos hosts que têm as duas tags (interseção)
+sc -c "df -h" -l @web @production
 
 # Combinar tags com hosts específicos
 sc -c "uptime" -l @production monitoring-server
@@ -468,6 +469,12 @@ Filtrar hosts...> production
 
 Mostrará apenas hosts que possuem a tag "production".
 
+Vários termos separados por espaço são combinados (todos devem coincidir). Use `@tag` para exigir a tag exata:
+
+```
+Filtrar hosts...> @web @production
+```
+
 **Listagem e Filtro por Tags**:
 
 O comando `sc -s` exibe as tags de cada host. Use `sc -s @tag` para filtrar:
@@ -481,7 +488,12 @@ sc -s @web
 
 # Lista apenas servidores com tag "production"
 sc -s @production
+
+# Lista apenas servidores que possuem as tags "web" E "production"
+sc -s @web @production
 ```
+
+> Ao informar mais de uma tag (em `sc -s`, `-l`, `sc cp up -l` ou dentro de arquivos de lista), apenas os hosts que possuem **todas** as tags são selecionados. Hosts informados diretamente (nome, IP ou `user@host:porta`) continuam sendo sempre incluídos.
 
 Exemplo de saída:
 ```

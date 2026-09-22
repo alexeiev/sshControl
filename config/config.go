@@ -260,17 +260,32 @@ func (c *ConfigFile) SaveConfig(filename string) error {
 
 // FindHostsByTag retorna todos os hosts que possuem a tag especificada
 func (c *ConfigFile) FindHostsByTag(tag string) []Host {
+	return c.FindHostsByTags([]string{tag})
+}
+
+// FindHostsByTags retorna os hosts que possuem TODAS as tags especificadas (interseção)
+func (c *ConfigFile) FindHostsByTags(tags []string) []Host {
+	if len(tags) == 0 {
+		return nil
+	}
+
 	var hosts []Host
-	tagLower := strings.ToLower(tag)
-	for _, host := range c.Hosts {
-		for _, t := range host.Tags {
-			if strings.ToLower(t) == tagLower {
-				hosts = append(hosts, host)
-				break
-			}
+	for i := range c.Hosts {
+		if c.Hosts[i].HasAllTags(tags) {
+			hosts = append(hosts, c.Hosts[i])
 		}
 	}
 	return hosts
+}
+
+// HasAllTags verifica se o host possui todas as tags informadas
+func (h *Host) HasAllTags(tags []string) bool {
+	for _, tag := range tags {
+		if !h.HasTag(tag) {
+			return false
+		}
+	}
+	return true
 }
 
 // GetAllTags retorna todas as tags únicas cadastradas nos hosts
