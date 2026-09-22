@@ -3,40 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404 - Página não encontrada | sshControl</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        .error-page {
-            text-align: center;
-            padding: 100px 20px;
-        }
-        .error-code {
-            font-size: 8rem;
-            font-weight: bold;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 20px;
-        }
-        .error-message {
-            font-size: 1.5rem;
-            color: var(--text-muted);
-            margin-bottom: 40px;
-        }
-    </style>
+    <title>Página não encontrada · sshControl</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2312101c'/%3E%3Cpath d='M8 10l6 6-6 6' fill='none' stroke='%23ffb547' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 22h8' stroke='%238b6cff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Martian+Mono:wdth,wght@75..112.5,400..800&display=swap">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="error-page">
-            <div class="error-code">404</div>
-            <h1>Página não encontrada</h1>
-            <p class="error-message">A página que você está procurando não existe.</p>
-            <div class="link-buttons">
-                <a href="/" class="btn btn-primary">🏠 Voltar para Home</a>
-                <a href="https://github.com/alexeiev/sshControl" class="btn btn-secondary" target="_blank">📁 GitHub</a>
-            </div>
+    <header class="topbar">
+        <div class="wrap topbar-inner">
+            <a class="wordmark" href="/"><span><span class="prompt">&gt;_</span> sshControl</span></a>
         </div>
-    </div>
+    </header>
+
+<div class="wrap">
+
+    <main class="lost">
+        <h1>Host não encontrado.</h1>
+        <p>O endereço que você abriu não existe neste site. Talvez ele tenha mudado de lugar.</p>
+
+        <div class="term">
+            <div class="term-bar"><i></i><i></i><i></i><span>~ — sc</span></div>
+<pre><span class="t-sig">$</span> sc pagina-perdida
+<span class="t-fail">❌ Host 'pagina-perdida' não encontrado no config.yaml</span>
+<span class="t-dim">   Use sc -s para listar os servidores cadastrados</span>
+<span class="t-sig">$</span> <span class="cursor" aria-hidden="true"></span></pre>
+        </div>
+
+        <div class="links">
+            <a class="btn primary" href="/">Voltar para o início</a>
+            <a class="btn" href="https://github.com/alexeiev/sshControl">Ver no GitHub</a>
+        </div>
+    </main>
+</div>
 </body>
 </html>

@@ -3,260 +3,607 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="sshControl - Gerenciador de conexões SSH com interface interativa (TUI) e modo CLI direto. Suporte a jump hosts, tags, proxy reverso, SFTP e execução em lote.">
-    <meta name="keywords" content="ssh, terminal, cli, tui, jump host, bastion, devops, sftp, proxy, tags">
-    <title>sshControl - Gerenciador de Conexões SSH</title>
+    <title>sshControl</title>
+    <meta name="description" content="sshControl (sc) é um gerenciador de conexões SSH em Go: menu interativo, jump hosts, tags, comandos remotos em vários hosts, SFTP, port-forward e proxy SOCKS5 num único binário.">
+    <meta name="keywords" content="ssh, cli, tui, jump host, bastion, socks5, tunnel, port-forward, sftp, devops, go">
+    <meta name="theme-color" content="#f2f1f7">
+    <meta property="og:title" content="sshControl">
+    <meta property="og:description" content="Seus servidores, a um sc de distância. Gerenciador de conexões SSH com TUI, jump hosts, tags, SFTP e tunnel SOCKS5.">
+    <meta property="og:url" content="https://sshcontrol.alexeiev.me/">
+    <meta property="og:type" content="website">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2312101c'/%3E%3Cpath d='M8 10l6 6-6 6' fill='none' stroke='%23ffb547' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 22h8' stroke='%238b6cff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&family=Martian+Mono:wdth,wght@75..112.5,400..800&display=swap">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>sshControl</h1>
-            <p class="tagline">Gerenciador de conexões SSH com interface interativa</p>
-        </header>
+    <header class="topbar">
+      <div class="wrap topbar-inner">
+        <a class="wordmark" href="/"><span><span class="prompt">&gt;_</span> sshControl</span><span class="ver">v1.0.0</span></a>
+        <nav class="topnav" aria-label="Seções">
+            <a href="#conectar">Conectar</a>
+            <a href="#comandos">Comandos Remotos</a>
+            <a href="#tuneis">Túneis</a>
+            <a href="#arquivos">Arquivos</a>
+            <a href="#referencia">Referência</a>
+            <a href="#instalar">Instalar</a>
+            <a href="https://github.com/alexeiev/sshControl">GitHub</a>
+        </nav>
+      </div>
+    </header>
 
-        <section class="hero">
-            <div class="install-box">
-                <h2>Instalação Rápida</h2>
-                <div class="command-box">
-                    <code>curl -fsSL https://sshcontrol.alexeiev.me/install | bash</code>
-                    <button onclick="copyToClipboard()" class="copy-btn" title="Copiar comando">
-                        <span class="copy-icon">&#128203;</span>
-                    </button>
-                </div>
-                <p class="install-note">Suporta Linux e macOS (Intel e Apple Silicon)</p>
-            </div>
-        </section>
+<div class="wrap">
 
-        <section class="features">
-            <h2>Características</h2>
-            <div class="feature-grid">
-                <div class="feature">
-                    <div class="feature-icon">&#128421;</div>
-                    <h3>Modo Interativo (TUI)</h3>
-                    <p>Menu visual para seleção de hosts com filtro por tags</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#9889;</div>
-                    <h3>Modo Direto</h3>
-                    <p>Conecte rapidamente via linha de comando</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128279;</div>
-                    <h3>Jump Hosts</h3>
-                    <p>Suporte completo para conexões via bastion/jump hosts</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#127991;</div>
-                    <h3>Tags para Hosts</h3>
-                    <p>Agrupe hosts por tags e execute comandos em lote por grupo</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#127760;</div>
-                    <h3>Proxy Reverso</h3>
-                    <p>Compartilhe proxy HTTP/HTTPS/FTP da máquina local com hosts remotos</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128230;</div>
-                    <h3>Execução em Lote</h3>
-                    <p>Execute comandos em múltiplos hosts simultaneamente</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128274;</div>
-                    <h3>Autenticação Flexível</h3>
-                    <p>Suporte para chaves SSH, SSH Agent e senha</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128273;</div>
-                    <h3>Auto-Instalação de Chaves</h3>
-                    <p>Instala automaticamente sua chave pública no servidor após primeira conexão</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128221;</div>
-                    <h3>Auto-Criação de Hosts</h3>
-                    <p>Salva automaticamente hosts não cadastrados no config.yaml</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128193;</div>
-                    <h3>Cópia de Arquivos</h3>
-                    <p>Transferência de arquivos via SFTP com suporte a múltiplos hosts</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128274;</div>
-                    <h3>Controle de Senha</h3>
-                    <p>Flag -a para solicitar senha antecipadamente (ideal para automações)</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">&#128260;</div>
-                    <h3>Auto-Atualização</h3>
-                    <p>Atualize para a versão mais recente com um comando</p>
-                </div>
-            </div>
-        </section>
-
-        <section class="usage">
-            <h2>Exemplos de Uso</h2>
-            <div class="example-grid">
-                <div class="example">
-                    <h4>Modo Interativo</h4>
-                    <pre><code>sc
-sc -u admin
-sc -j production-jump
-sc -p</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Conexão Direta</h4>
-                    <pre><code>sc webserver
-sc 192.168.1.50
-sc ubuntu@host:2222</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Via Jump Host</h4>
-                    <pre><code>sc -j production-jump webserver
-sc -j 1 webserver
-sc -j 1 -p webserver</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Comando Remoto</h4>
-                    <pre><code>sc -c "uptime" webserver
-sc -j 1 -c "df -h" app-server</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Múltiplos Hosts</h4>
-                    <pre><code>sc -c "df -h" -l web1 web2 web3
-sc -a -c "uptime" -l web1 web2</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Usando Tags</h4>
-                    <pre><code>sc -c "uptime" -l @web
-sc -c "df -h" -l @production
-sc -s @ansible</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Download de Arquivos</h4>
-                    <pre><code>sc cp down webserver /var/log/app.log
-sc cp down -r webserver /etc/nginx/ ./
-sc cp down -j 1 db /backup/dump.sql</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Upload de Arquivos</h4>
-                    <pre><code>sc cp up ./config.yaml webserver
-sc cp up -l web1 web2 ./script.sh /opt/
-sc cp up -r ./dist/ /var/www/ webserver</code></pre>
-                </div>
-                <div class="example">
-                    <h4>Comandos Úteis</h4>
-                    <pre><code>sc -s
-sc -s @production
-sc --version
-sc update
-sc man</code></pre>
-                </div>
-            </div>
-        </section>
-
-        <section class="config-example">
-            <h2>Exemplo de Configuração</h2>
-            <div class="config-box">
-                <pre><code>config:
-  default_user: ubuntu
-  auto_create: false
-  dir_cp_default: ~/sshControl
-  proxy: "192.168.0.1:3128"
-  proxy_port: 9999
-  users:
-    - name: ubuntu
-      ssh_keys:
-        - ~/.ssh/id_rsa
-        - ~/.ssh/id_ed25519
-  jump_hosts:
-    - name: production-jump
-      host: jump.production.example.com
-      user: ubuntu
-      port: 22
-
-hosts:
-  - name: webserver
-    host: 192.168.1.50
-    port: 22
-    tags:
-      - web
-      - production
-  - name: database
-    host: 192.168.1.51
-    port: 22
-    tags:
-      - db
-      - production</code></pre>
-            </div>
-            <p class="config-note">Arquivo de configuração: <code>~/.sshControl/config.yaml</code></p>
-        </section>
-
-        <section class="links">
-            <h2>Links</h2>
-            <div class="link-buttons">
-                <a href="https://github.com/alexeiev/sshControl" class="btn btn-primary" target="_blank">
-                    GitHub
-                </a>
-                <a href="https://github.com/alexeiev/sshControl/releases" class="btn btn-secondary" target="_blank">
-                    Releases
-                </a>
-                <a href="https://github.com/alexeiev/sshControl/blob/main/README.md" class="btn btn-secondary" target="_blank">
-                    Documentação
-                </a>
-                <a href="https://github.com/alexeiev/sshControl/issues" class="btn btn-secondary" target="_blank">
-                    Issues
-                </a>
-            </div>
-        </section>
-
-        <section class="manual-install">
-            <h2>Outras Opções de Instalação</h2>
-            <div class="install-options">
-                <div class="option">
-                    <h4>Instalação Customizada</h4>
-                    <pre><code># Instalar em diretório específico
-curl -fsSL https://sshcontrol.alexeiev.me/install | bash -s -- --dir=$HOME/.local/bin
-
-# Ver opções disponíveis
-curl -fsSL https://sshcontrol.alexeiev.me/install | bash -s -- --help</code></pre>
-                </div>
-                <div class="option">
-                    <h4>Instalação Manual</h4>
-                    <p>Baixe o binário pré-compilado das <a href="https://github.com/alexeiev/sshControl/releases/latest">releases</a></p>
-                </div>
-                <div class="option">
-                    <h4>Compilar do Código</h4>
-                    <pre><code>git clone https://github.com/alexeiev/sshControl.git
-cd sshControl
-make build</code></pre>
-                </div>
-            </div>
-        </section>
-
-        <footer>
-            <p>
-                Desenvolvido por <a href="https://github.com/alexeiev" target="_blank">alexeiev</a>
-                | Licença GPL-3.0
-                | <a href="https://github.com/alexeiev/sshControl">Código Fonte</a>
+    <!-- ============================== HERO ============================== -->
+    <section class="hero">
+        <div>
+            <a class="release-note" href="https://github.com/alexeiev/sshControl/releases/tag/v1.0.0">
+                <span class="tag">v1.0.0</span> sc tunnel com SOCKS5 e filtro por várias tags
+            </a>
+            <h1>Seus servidores, a um <span class="sc">sc</span> de distância.</h1>
+            <p class="lede">
+                sshControl é um gerenciador de conexões SSH em um único binário. Você escolhe o host num menu,
+                passa por jump hosts, roda comandos em dezenas de máquinas de uma vez, copia arquivos
+                e abre túneis. Tudo a partir de um <code>config.yaml</code>.
             </p>
-        </footer>
-    </div>
 
-    <script>
-        function copyToClipboard() {
-            const command = 'curl -fsSL https://sshcontrol.alexeiev.me/install | bash';
-            navigator.clipboard.writeText(command).then(() => {
-                const btn = document.querySelector('.copy-btn');
-                const icon = btn.querySelector('.copy-icon');
-                icon.innerHTML = '&#10003;';
-                setTimeout(() => {
-                    icon.innerHTML = '&#128203;';
+            <div class="install">
+                <span class="install-label" id="install-label">Instalar</span>
+                <div class="cmd" role="group" aria-labelledby="install-label">
+                    <code id="install-cmd"><span class="dollar">$ </span>curl -fsSL https://sshcontrol.alexeiev.me/install | bash</code>
+                    <button class="copy" id="copy-install" type="button" data-copy="curl -fsSL https://sshcontrol.alexeiev.me/install | bash">Copiar</button>
+                </div>
+                <div class="platforms">
+                    <span>Linux amd64</span>
+                    <span>macOS Apple Silicon</span>
+                    <span>macOS Intel</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="term" aria-label="Exemplo: comando executado em três servidores via jump host">
+            <div class="term-bar"><i></i><i></i><i></i><span>~ — sc</span></div>
+<pre><span class="t-sig">$</span> sc -j 1 -c "uptime" -l @web @production
+
+🏷️  Tags: web, production
+🚀 Executando comando em 3 host(s): uptime
+<span class="t-dim">   via Jump Host: production-jump (ubuntu@jump.prod:22)</span>
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="t-ok">✅ Host: web1</span> <span class="t-dim">(Exit Code: 0)</span>
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+ 14:02:11 up 41 days,  load average: 0.08, 0.11
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="t-ok">✅ Host: web2</span> <span class="t-dim">(Exit Code: 0)</span>
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+ 14:02:11 up 41 days,  load average: 0.21, 0.17
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="t-fail">❌ Host: web3</span> <span class="t-dim">(Exit Code: -1)</span>
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+Erro: erro ao conectar: i/o timeout
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+📊 Resumo: <span class="t-ok">2 sucesso(s)</span>, <span class="t-fail">1 falha(s)</span>, 3 total | ⏱️  Tempo: 1.42s
+<span class="t-sig">$</span> <span class="cursor" aria-hidden="true"></span></pre>
+        </div>
+    </section>
+
+    <!-- ============================ CONECTAR ============================ -->
+    <section class="man" id="conectar">
+        <div class="man-head"><h2>Conectar<small>sc [host]</small></h2></div>
+        <div class="man-body">
+            <div class="intro">
+                <h3>Pelo menu ou direto pela linha de comando.</h3>
+                <p>
+                    Sem argumentos, o <code>sc</code> abre um menu com seus hosts. Com um nome, IP ou
+                    <code>user@host:porta</code>, conecta na hora com uma sessão interativa completa,
+                    que acompanha o redimensionamento do terminal.
+                </p>
+            </div>
+
+            <div class="pair">
+                <div>
+                    <h4>Menu interativo (TUI)</h4>
+                    <p>
+                        Navegue pelas setas, tecle <code>/</code> para filtrar por nome, IP ou tag e
+                        <code>Enter</code> para conectar. Vários termos se combinam:
+                        <code>@web @production</code> mostra apenas quem tem as duas tags.
+                    </p>
+                    <p>
+                        O cabeçalho mostra o usuário, o jump host e o proxy ativos, e muda conforme
+                        <code>-u</code>, <code>-j</code> e <code>-p</code>.
+                    </p>
+                </div>
+                <div class="term tui">
+                    <div class="term-bar"><i></i><i></i><i></i><span>sc -j 1</span></div>
+<div class="tui-banner"><span class="t-brand t-b">🚀 SSH Control</span> <span class="t-dim">v1.0.0</span>  <span class="t-dim">|</span>  SSH User: <span class="t-ok t-b">ubuntu</span>  <span class="t-dim">|</span>  Jump Host: <span class="t-ok t-b">production-jump</span>  <span class="t-dim">|</span>  Proxy: <span class="t-fail">FALSE</span></div>
+<pre><span class="t-sig">Filtro:</span> @web @production<span class="cursor" aria-hidden="true"></span>
+
+  <span class="sel">│ web1</span>
+  <span class="sel">│ <span class="t-dim">10.0.1.11 [web, production]</span></span>
+
+    web2
+    <span class="t-dim">10.0.1.12 [web, production, nginx]</span>
+
+    web3
+    <span class="t-dim">10.0.1.13 [web, production]</span></pre>
+                </div>
+            </div>
+
+            <div class="pair">
+                <div>
+                    <h4>Conexão direta</h4>
+                    <p>
+                        Use um host do config ou qualquer endereço. Com <code>auto_create: true</code>,
+                        endereços novos são salvos no config com a tag <code>autocreated</code> após a primeira conexão.
+                    </p>
+                    <p>
+                        Usuários e jump hosts são escolhidos por nome ou pelo índice que aparece no
+                        <code>sc -s</code>: <code>-u1</code>, <code>-j 2</code>.
+                    </p>
+                </div>
+<pre class="snip"><span class="p">$ </span>sc webserver
+<span class="p">$ </span>sc 192.168.1.50
+<span class="p">$ </span>sc ubuntu@192.168.1.50:2222
+<span class="p">$ </span>sc -u deploy -j production-jump webserver
+<span class="p">$ </span>sc -u1 -j 1 webserver     <span class="c"># por índice</span>
+
+<span class="p">$ </span>sc -s                     <span class="c"># lista tudo</span>
+<span class="p">$ </span>sc -s @users              <span class="c"># só usuários</span></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================= COMANDOS REMOTOS ========================= -->
+    <section class="man" id="comandos">
+        <div class="man-head"><h2>Comandos Remotos<small>sc -c "…" -l</small></h2></div>
+        <div class="man-body">
+            <div class="intro">
+                <h3>Um comando, um ou muitos servidores.</h3>
+                <p>
+                    Com <code>-c</code>, o <code>sc</code> executa o comando no host e sai:
+                    <code>sc -c "uptime" webserver</code>. Com <code>-l</code>, o comando roda em todos os
+                    hosts ao mesmo tempo. A saída de cada um vem separada, com o código de saída, e no final
+                    aparece um resumo com sucessos, falhas e o tempo total.
+                </p>
+            </div>
+
+            <div class="pair">
+                <div>
+                    <h4>Exemplo: um grupo de servidores</h4>
+                    <p>
+                        O grupo <code>@webservers</code> tem três máquinas cadastradas no config.
+                        Com <code>-l @webservers</code>, o comando roda nas três ao mesmo tempo.
+                    </p>
+                    <p>
+                        Os resultados aparecem na ordem em que cada host termina, não na ordem do config.
+                    </p>
+                </div>
+<pre class="snip yaml"><span class="c"># ~/.sshControl/config.yaml</span>
+<span class="k">hosts:</span>
+  - <span class="k">name:</span> <span class="s">webserver01</span>
+    <span class="k">host:</span> <span class="s">10.10.0.200</span>
+    <span class="k">port:</span> <span class="n">22</span>
+    <span class="k">tags:</span> [<span class="s">webservers</span>]
+  - <span class="k">name:</span> <span class="s">webserver02</span>
+    <span class="k">host:</span> <span class="s">10.10.0.201</span>
+    <span class="k">port:</span> <span class="n">22</span>
+    <span class="k">tags:</span> [<span class="s">webservers</span>]
+  - <span class="k">name:</span> <span class="s">webserver03</span>
+    <span class="k">host:</span> <span class="s">10.10.0.202</span>
+    <span class="k">port:</span> <span class="n">22</span>
+    <span class="k">tags:</span> [<span class="s">webservers</span>]</pre>
+            </div>
+
+            <div class="term" aria-label="Exemplo: date e uptime nos três hosts do grupo webservers">
+                <div class="term-bar"><i></i><i></i><i></i><span>~ — sc</span></div>
+<pre><span class="t-sig">$</span> sc -c 'date; uptime' -l @webservers
+
+🏷️  Tags: webservers
+🚀 Executando comando em 3 host(s): date; uptime
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="t-ok">✅ Host: webserver02</span> <span class="t-dim">(Exit Code: 0)</span>
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+Tue Sep 22 14:02:11 UTC 2026
+ 14:02:11 up 63 days,  4:27,  0 users,  load average: 0.12, 0.09, 0.08
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="t-ok">✅ Host: webserver01</span> <span class="t-dim">(Exit Code: 0)</span>
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+Tue Sep 22 14:02:11 UTC 2026
+ 14:02:11 up 41 days,  3:12,  0 users,  load average: 0.08, 0.11, 0.09
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="t-ok">✅ Host: webserver03</span> <span class="t-dim">(Exit Code: 0)</span>
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+Tue Sep 22 14:02:12 UTC 2026
+ 14:02:12 up 12 days, 22:05,  0 users,  load average: 0.31, 0.27, 0.22
+
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+📊 Resumo: <span class="t-ok">3 sucesso(s)</span>, 0 falha(s), 3 total | ⏱️  Tempo: 0.84s
+<span class="t-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>
+<span class="t-sig">$</span> <span class="cursor" aria-hidden="true"></span></pre>
+            </div>
+
+            <div class="pair">
+                <div>
+                    <h4>Tags por interseção <span class="new">v1.0</span></h4>
+                    <p>
+                        Hosts podem ter várias tags. Quando você informa mais de uma, só entram os hosts
+                        que têm <em>todas</em>. Hosts passados pelo nome ou IP entram sempre.
+                    </p>
+                    <p>
+                        A regra vale para <code>-s</code>, <code>-l</code>, <code>sc cp up -l</code>,
+                        para arquivos de lista e para o filtro da TUI.
+                    </p>
+                </div>
+                <div>
+                    <div class="tagmatrix">
+                        <div class="tagmatrix-cmd"><span class="p">$ </span>sc -s @web @production</div>
+                        <table>
+                            <thead>
+                                <tr><th scope="col">Host</th><th scope="col">Tags</th><th scope="col">Resultado</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr class="match"><td class="host">web1</td><td><span class="chip on">web</span><span class="chip on">production</span></td><td class="verdict">Entra</td></tr>
+                                <tr class="match"><td class="host">web2</td><td><span class="chip on">web</span><span class="chip on">production</span><span class="chip">nginx</span></td><td class="verdict">Entra</td></tr>
+                                <tr><td class="host">staging-web</td><td><span class="chip on">web</span><span class="chip">staging</span></td><td class="verdict">Fica fora</td></tr>
+                                <tr><td class="host">database</td><td><span class="chip">db</span><span class="chip on">production</span></td><td class="verdict">Fica fora</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="caption">Apenas <code>web1</code> e <code>web2</code> têm as duas tags.</p>
+                </div>
+            </div>
+
+            <div class="pair">
+                <div>
+                    <h4>Hosts, IPs, tags e arquivos na mesma lista</h4>
+                    <p>
+                        O <code>-l</code> aceita nomes do config, IPs, <code>user@host:porta</code>, tags
+                        e arquivos texto. No arquivo, os hosts podem vir um por linha ou separados por
+                        vírgula ou ponto e vírgula, e também podem ser tags.
+                    </p>
+                </div>
+<pre class="snip"><span class="p">$ </span>sc -c "df -h" -l web1 web2 192.168.1.50
+<span class="p">$ </span>sc -c "uptime" -l @web
+<span class="p">$ </span>sc -c "hostname" -l @production server1
+<span class="p">$ </span>sc -c "uptime" -l lista.txt @web
+<span class="p">$ </span>sc -j 1 -u admin -c "systemctl status nginx" -l @web</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================== TÚNEIS ============================== -->
+    <section class="man" id="tuneis">
+        <div class="man-head"><h2>Túneis<small>tunnel · port-forward · -p</small></h2></div>
+        <div class="man-body">
+            <div class="intro">
+                <h3>Leve seu navegador, suas portas e seu proxy até o outro lado.</h3>
+                <p>
+                    O sshControl tem três formas de túnel sobre SSH. Todas funcionam através de jump hosts
+                    e com as mesmas opções de usuário e senha.
+                </p>
+            </div>
+
+            <div class="pair stack">
+                <div>
+                    <h4><code>sc tunnel</code>, proxy SOCKS5 <span class="new">v1.0</span></h4>
+                    <p>
+                        Abre uma conexão com o jump host e cria um proxy SOCKS5 em
+                        <code>localhost:4000</code>. Aponte o navegador para ele e acesse painéis e APIs da
+                        rede interna. Os nomes de domínio são resolvidos no jump host.
+                    </p>
+                    <p>
+                        Roda em background por padrão. Use <code>-v</code> para acompanhar o tráfego em
+                        foreground. A porta segue <code>--port</code>, depois <code>local_port_socks</code>, depois 4000.
+                    </p>
+                </div>
+                <div>
+                    <div class="route" aria-label="Rota do tunnel SOCKS5">
+                        <ol>
+                            <li>
+                                <span class="node"></span>
+                                <span class="where">Sua máquina</span>
+                                <span class="what">127.0.0.1:4000</span>
+                                <span class="how">Navegador com proxy SOCKS5</span>
+                            </li>
+                            <li>
+                                <span class="node"></span>
+                                <span class="where">Jump host</span>
+                                <span class="what">production-jump</span>
+                                <span class="how">SSH com keepalive de 30s; DNS resolvido aqui</span>
+                            </li>
+                            <li>
+                                <span class="node"></span>
+                                <span class="where">Rede interna</span>
+                                <span class="what">grafana.internal</span>
+                                <span class="how">Qualquer destino que o jump host alcança</span>
+                            </li>
+                        </ol>
+                        <p class="route-foot">
+                            Se o jump host só é alcançável por outro equipamento (uma VPN em outra máquina, por exemplo),
+                            configure <code>routes.gateway</code> e <code>routes.networks</code>. O <code>sc</code> cria as rotas via
+                            <code>sudo</code> antes de abrir o tunnel e as remove no <code>stop</code>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+<pre class="snip"><span class="p">$ </span>sc tunnel -j 1                        <span class="c"># background, SOCKS5 em localhost:4000</span>
+<span class="p">$ </span>sc tunnel -j production-jump --port 5000
+<span class="p">$ </span>sc tunnel -j 1 -v                     <span class="c"># foreground mostrando o tráfego</span>
+<span class="p">$ </span>sc tunnel status                      <span class="c"># tunnels ativos e rotas pendentes</span>
+<span class="p">$ </span>sc tunnel stop -j 1                   <span class="c"># ou sem -j para encerrar todos</span></pre>
+
+            <div class="items">
+                <div class="item">
+                    <h4>Port forward</h4>
+                    <p>
+                        Traz uma porta remota para a sua máquina, como o <code>ssh -L</code>. Cada conexão
+                        aparece no log com origem, bytes e duração. O Ctrl+C mostra as estatísticas da sessão.
+                    </p>
+<pre class="snip"><span class="p">$ </span>sc port-forward db-server 3307:3306
+<span class="p">$ </span>sc port-forward -j 1 db-prod 5433:5432</pre>
+                </div>
+                <div class="item">
+                    <h4>Proxy reverso</h4>
+                    <p>
+                        O caminho contrário: o host remoto usa o proxy HTTP da sua rede. Configure
+                        <code>proxy</code> e <code>proxy_port</code> e conecte com <code>-p</code>.
+                    </p>
+<pre class="snip"><span class="p">$ </span>sc -j 1 -p app-server
+<span class="c"># no host remoto:</span>
+export {https,http,ftp}_proxy=http://127.0.0.1:9999</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================ ARQUIVOS ============================ -->
+    <section class="man" id="arquivos">
+        <div class="man-head"><h2>Arquivos<small>sc cp up · down</small></h2></div>
+        <div class="man-body">
+            <div class="pair">
+                <div class="intro">
+                    <h3>SFTP com barra de progresso, para um host ou para vários.</h3>
+                    <p>
+                        <code>sc cp down</code> baixa arquivos para o <code>dir_cp_default</code> ou para o
+                        destino informado. <code>sc cp up</code> envia para um host ou, com <code>-l</code>,
+                        para vários em paralelo, aceitando tags e arquivos de lista. Use <code>-r</code> para
+                        copiar diretórios e <code>~</code> para a home remota.
+                    </p>
+                </div>
+<pre class="snip"><span class="c"># download</span>
+<span class="p">$ </span>sc cp down webserver /var/log/app.log
+<span class="p">$ </span>sc cp down -r webserver /etc/nginx/ ./nginx-backup/
+<span class="p">$ </span>sc cp down -j 1 db-prod /backup/dump.sql ./
+
+<span class="c"># upload</span>
+<span class="p">$ </span>sc cp up ./config.yaml /etc/app/ webserver
+<span class="p">$ </span>sc cp up -r ./dist/ /var/www/html/ webserver
+<span class="p">$ </span>sc cp up -l @web ./deploy.sh /opt/
+<span class="p">$ </span>sc cp up -l app1 app2 -j prod-jump ./app.jar /opt/app/</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================== AUTENTICAÇÃO ========================== -->
+    <section class="man" id="autenticacao">
+        <div class="man-head"><h2>Autenticação<small>-a · -P · -v</small></h2></div>
+        <div class="man-body">
+            <div class="intro">
+                <h3>As chaves vêm primeiro. A senha, só quando precisa.</h3>
+                <p>
+                    Cada conexão tenta as formas de autenticação nesta ordem e para na primeira que funciona.
+                    Quando a senha resolve, sua chave pública é instalada no servidor via SFTP, e a próxima
+                    conexão já entra pela chave.
+                </p>
+            </div>
+
+            <ol class="chain">
+                <li><strong>Chaves SSH</strong><span>Todas as chaves do usuário no config, em sequência</span></li>
+                <li><strong>SSH Agent</strong><span>As identidades carregadas no agent</span></li>
+                <li><strong>Senha</strong><span>Pedida no terminal, ou vinda de <code>-a</code> ou <code>-P</code></span></li>
+                <li><strong>Chave instalada</strong><span>Vai para o <code>authorized_keys</code> do servidor</span></li>
+            </ol>
+
+            <div class="items">
+                <div class="item">
+                    <h4><code>-a</code> Pedir a senha antes</h4>
+                    <p>Pede a senha uma vez, antes de conectar. Em <code>-l</code>, a mesma senha vale para todos os hosts.</p>
+                </div>
+                <div class="item">
+                    <h4><code>-P</code> Senha por variável de ambiente</h4>
+                    <p>Lê a senha de <code>SCPW</code>, sem prompt. Serve para CI/CD e scripts, e tem precedência sobre <code>-a</code>.</p>
+                </div>
+                <div class="item">
+                    <h4><code>-v</code> Modo debug</h4>
+                    <p>Mostra os métodos de autenticação, o status de cada chave, o caminho via jump host e o PTY. Tudo vai para o stderr.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================== CONFIGURAÇÃO ========================== -->
+    <section class="man" id="config">
+        <div class="man-head"><h2>Configuração<small>~/.sshControl/config.yaml</small></h2></div>
+        <div class="man-body">
+            <div class="pair">
+                <div class="intro">
+                    <h3>Um arquivo YAML que se atualiza sozinho.</h3>
+                    <p>
+                        Na primeira execução, o <code>sc</code> cria um template comentado. A cada nova versão,
+                        as chaves que faltam no seu config são adicionadas com os valores padrão e comentários,
+                        sem mexer no que já existe.
+                    </p>
+                    <p>
+                        O <code>sc update</code> busca a última release no GitHub, mostra as novidades e
+                        substitui o binário, guardando um backup do anterior.
+                    </p>
+                </div>
+<pre class="snip yaml"><span class="k">config:</span>
+  <span class="k">default_user:</span> <span class="s">ubuntu</span>
+  <span class="k">auto_create:</span> <span class="n">false</span>
+  <span class="k">dir_cp_default:</span> <span class="s">~/sshControl</span>
+  <span class="k">proxy:</span> <span class="s">"192.168.0.1:3128"</span>
+  <span class="k">proxy_port:</span> <span class="n">9999</span>
+  <span class="k">users:</span>
+    - <span class="k">name:</span> <span class="s">ubuntu</span>
+      <span class="k">ssh_keys:</span> [<span class="s">~/.ssh/id_ed25519</span>, <span class="s">~/.ssh/id_rsa</span>]
+  <span class="k">jump_hosts:</span>
+    - <span class="k">name:</span> <span class="s">production-jump</span>
+      <span class="k">host:</span> <span class="s">jump.production.example.com</span>
+      <span class="k">user:</span> <span class="s">ubuntu</span>
+      <span class="k">port:</span> <span class="n">22</span>
+      <span class="k">local_port_socks:</span> <span class="n">4000</span>   <span class="c"># sc tunnel</span>
+      <span class="k">routes:</span>                  <span class="c"># opcional</span>
+        <span class="k">gateway:</span> <span class="s">"192.168.0.10"</span>
+        <span class="k">networks:</span> [<span class="s">"10.20.0.0/16"</span>]
+
+<span class="k">hosts:</span>
+  - <span class="k">name:</span> <span class="s">webserver</span>
+    <span class="k">host:</span> <span class="s">192.168.1.50</span>
+    <span class="k">port:</span> <span class="n">22</span>
+    <span class="k">tags:</span> [<span class="s">web</span>, <span class="s">production</span>]</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================== REFERÊNCIA =========================== -->
+    <section class="man" id="referencia">
+        <div class="man-head"><h2>Referência<small>sc -h · sc man</small></h2></div>
+        <div class="man-body">
+            <div class="ref">
+                <table>
+                    <thead>
+                        <tr><th scope="col">Opção</th><th scope="col">O que faz</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr class="ref-group"><td colspan="2">Flags</td></tr>
+                        <tr><td>-u, --user <span>&lt;nome|índice&gt;</span></td><td>Usuário do config a usar</td></tr>
+                        <tr><td>-j, --jump <span>&lt;nome|índice&gt;</span></td><td>Conecta através de um jump host</td></tr>
+                        <tr><td>-c, --command <span>"…"</span></td><td>Executa um comando remoto e sai</td></tr>
+                        <tr><td>-l, --list</td><td>Vários hosts: nomes, IPs, <code>@tags</code> e arquivos texto</td></tr>
+                        <tr><td>-s, --servers <span>[@tag…]</span></td><td>Lista usuários, jump hosts e servidores (<code>@users</code> mostra só os usuários)</td></tr>
+                        <tr><td>-p, --proxy</td><td>Proxy reverso para o host remoto</td></tr>
+                        <tr><td>-a, --ask-password</td><td>Pede a senha antes de conectar</td></tr>
+                        <tr><td>-P, --env-password</td><td>Usa a senha da variável <code>SCPW</code></td></tr>
+                        <tr><td>-v, --verbose</td><td>Modo debug (no <code>tunnel</code>, roda em foreground)</td></tr>
+                        <tr><td>-V, --version</td><td>Versão, data do build e commit</td></tr>
+                        <tr class="ref-group"><td colspan="2">Subcomandos</td></tr>
+                        <tr><td>sc tunnel <span>-j &lt;jump&gt;</span></td><td>Proxy SOCKS5 local via jump host (<code>status</code>, <code>stop</code>)</td></tr>
+                        <tr><td>sc port-forward <span>&lt;host&gt; L:R</span></td><td>Encaminha uma porta local para uma porta remota</td></tr>
+                        <tr><td>sc cp down <span>|</span> up</td><td>Transfere arquivos via SFTP (<code>-r</code>, <code>-l</code>)</td></tr>
+                        <tr><td>sc update</td><td>Atualiza para a última release</td></tr>
+                        <tr><td>sc man</td><td>Manual completo com exemplos</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================== INSTALAÇÃO =========================== -->
+    <section class="man" id="instalar">
+        <div class="man-head"><h2>Instalar<small>linux · macos</small></h2></div>
+        <div class="man-body">
+            <div class="install-list">
+                <div class="install-row">
+                    <h4>Script de instalação</h4>
+                    <p>Detecta o sistema e a arquitetura, baixa a última release e instala em <code>/usr/local/bin</code>.</p>
+                    <div class="cmd">
+                        <code><span class="dollar">$ </span>curl -fsSL https://sshcontrol.alexeiev.me/install | bash</code>
+                        <button class="copy" type="button" data-copy="curl -fsSL https://sshcontrol.alexeiev.me/install | bash">Copiar</button>
+                    </div>
+                </div>
+                <div class="install-row">
+                    <h4>Instalar em outro diretório</h4>
+                    <p>Use <code>--dir</code> para instalar sem <code>sudo</code>, por exemplo em <code>~/.local/bin</code>.</p>
+                    <div class="cmd">
+                        <code><span class="dollar">$ </span>curl -fsSL https://sshcontrol.alexeiev.me/install | bash -s -- --dir=$HOME/.local/bin</code>
+                        <button class="copy" type="button" data-copy="curl -fsSL https://sshcontrol.alexeiev.me/install | bash -s -- --dir=$HOME/.local/bin">Copiar</button>
+                    </div>
+                </div>
+                <div class="install-row">
+                    <h4>Compilar do código</h4>
+                    <p>Requer Go. O <code>make build</code> grava a versão e o commit no binário.</p>
+                    <div class="cmd">
+                        <code class="multi"><span class="dollar">$ </span>git clone https://github.com/alexeiev/sshControl.git
+<span class="dollar">$ </span>cd sshControl
+<span class="dollar">$ </span>make build</code>
+                        <button class="copy" type="button" data-copy="git clone https://github.com/alexeiev/sshControl.git
+cd sshControl
+make build">Copiar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="links">
+                <a class="btn primary" href="https://github.com/alexeiev/sshControl">Código no GitHub</a>
+                <a class="btn" href="https://github.com/alexeiev/sshControl/releases/latest">Baixar binários</a>
+                <a class="btn" href="https://github.com/alexeiev/sshControl/blob/main/CHANGELOG.md">Changelog</a>
+                <a class="btn" href="https://github.com/alexeiev/sshControl/issues">Reportar um problema</a>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <span>sshControl · feito por <a href="https://github.com/alexeiev">alexeiev</a></span>
+        <span>Licença GPL-3.0</span>
+    </footer>
+</div>
+
+<script>
+    // Botões "Copiar": copiam o texto de data-copy (sem o prompt "$")
+    document.querySelectorAll('[data-copy]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var text = btn.getAttribute('data-copy');
+            var done = function () {
+                btn.textContent = 'Copiado';
+                btn.classList.add('done');
+                setTimeout(function () {
+                    btn.textContent = 'Copiar';
+                    btn.classList.remove('done');
                 }, 2000);
-            }).catch(err => {
-                console.error('Erro ao copiar:', err);
+            };
+            var fallback = function () {
+                var range = document.createRange();
+                range.selectNodeContents(btn.parentNode.querySelector('code'));
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done, fallback);
+            } else {
+                fallback();
+            }
+        });
+    });
+
+    // Destaca no menu a seção visível
+    (function () {
+        var links = {};
+        document.querySelectorAll('.topnav a[href^="#"]').forEach(function (a) {
+            links[a.getAttribute('href').slice(1)] = a;
+        });
+        if (!('IntersectionObserver' in window)) return;
+        var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                var link = links[entry.target.id];
+                if (!link || !entry.isIntersecting) return;
+                Object.keys(links).forEach(function (id) { links[id].classList.remove('active'); });
+                link.classList.add('active');
             });
-        }
-    </script>
+        }, { rootMargin: '-45% 0px -50% 0px' });
+        document.querySelectorAll('section.man[id]').forEach(function (section) {
+            observer.observe(section);
+        });
+    })();
+</script>
 </body>
 </html>
