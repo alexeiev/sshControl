@@ -36,6 +36,10 @@ config:
       host: jump.production.example.com
       user: ubuntu
       port: 22
+      local_port_socks: 4000  # Porta local do proxy SOCKS5 usada pelo 'sc tunnel' (opcional, padrão: 4000)
+      routes:                 # Rotas criadas pelo 'sc tunnel' para alcançar o jump host (opcional, requer sudo)
+        gateway: ""           # Equipamento que alcança a rede do jump host (ex: 192.168.1.36)
+        networks: []          # Redes em CIDR (ex: [10.0.0.0/8]). Só aplica com gateway e networks preenchidos
     - name: staging-jump
       host: jump.staging.example.com
       user: ubuntu

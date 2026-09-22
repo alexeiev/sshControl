@@ -5,7 +5,24 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+## [1.0.0] - 2026-09-22
+
+### Added
+
+- **Tunnel SOCKS5 via jump host (`sc tunnel`)**: Abre um tunnel SSH com o jump host e disponibiliza um proxy SOCKS5 local para o navegador (similar ao `ssh -D`)
+  - `sc tunnel -j <nome|índice>` roda em background e informa o endereço a configurar no navegador (padrão: `localhost:4000`)
+  - `-v` roda em foreground exibindo o tráfego (origem → destino, bytes e duração) e estatísticas ao encerrar
+  - Porta local: `--port` > novo campo `local_port_socks` do jump host > `4000`
+  - Suporta `-u`, `-a` e `-P`
+  - `sc tunnel status` lista os tunnels ativos e `sc tunnel stop [-j <jump>]` encerra um ou todos
+  - O proxy escuta apenas em `127.0.0.1` e o DNS é resolvido no jump host
+  - Keepalive SSH; se a conexão cair, o tunnel em background é encerrado
+- Novo campo `local_port_socks` em `jump_hosts` no `config.yaml`
+- **Rotas para alcançar o jump host no `sc tunnel`**: novo objeto `routes` (`gateway` + `networks`) em `jump_hosts`, para quando o jump host só é alcançável por outro equipamento (ex.: VPN em outra máquina)
+  - As rotas são criadas via `sudo` antes do tunnel (`route` no macOS, `ip route` no Linux) e removidas pelo `sc tunnel stop` ou Ctrl+C em foreground
+  - Rotas pré-existentes são mantidas; falhas desfazem as rotas criadas e impedem a abertura do tunnel
+  - `sc tunnel status` exibe as rotas de cada tunnel e rotas pendentes de tunnels que caíram
+  - A migração do `config.yaml` adiciona `routes` com `gateway: ""` e `networks: []` aos jump hosts existentes (rotas desativadas até serem preenchidas)
 
 ### Changed
 
@@ -15,6 +32,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   - Hosts informados diretamente (nome, IP ou `user@host:porta`) continuam sendo sempre incluídos
   - Filtro da TUI combina múltiplos termos separados por espaço; termos `@tag` exigem a tag exata
 - Novas funções `FindHostsByTags` e `HasAllTags` no pacote `config`
+
+### Fixed
+
+- **Migração do `config.yaml` com campos numéricos em listas**: ao adicionar um campo novo em itens de lista (ex.: `jump_hosts`), a migração gravava `""` também em campos numéricos/booleanos, quebrando o carregamento (`cannot unmarshal !!str into int`). Agora esses campos recebem o valor padrão do template (ex.: `local_port_socks: 4000`), e valores `""` já gravados são corrigidos automaticamente
+- **Migração de objetos aninhados em itens de lista**: campos do tipo objeto (ex.: `routes` em `jump_hosts`) passam a ser adicionados com seus subcampos vazios, e objetos parciais já existentes são completados
 
 ## [0.9.0] - 2026-07-24
 
@@ -283,7 +305,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/alexeiev/sshControl/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/alexeiev/sshControl/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/alexeiev/sshControl/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/alexeiev/sshControl/compare/v0.6.0...v0.7.0

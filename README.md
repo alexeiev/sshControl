@@ -22,6 +22,7 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 📝 **Auto-Criação de Hosts**: Salva automaticamente hosts não cadastrados no config.yaml
 - 📁 **Cópia de Arquivos**: Transferência de arquivos via SFTP com suporte a múltiplos hosts
 - 🚇 **Port Forward**: Encaminhe portas locais para remotas via túnel SSH (similar ao kubectl port-forward)
+- 🧦 **Tunnel SOCKS5**: Proxy SOCKS5 local via jump host para navegar pela rede remota (similar ao `ssh -D`)
 - 🔍 **Modo Debug**: Flag `-v` para exibir informações detalhadas da conexão e facilitar diagnósticos
 - 🔄 **Auto-Atualização**: Atualize para a versão mais recente com um comando
 
@@ -696,6 +697,95 @@ sc port-forward -a webserver 8080:80
 2. **APIs internas**: Acesse APIs que só estão disponíveis na rede interna
 3. **Dashboards**: Acesse interfaces web de monitoramento (Grafana, Kibana, etc.)
 4. **Debug**: Conecte debuggers a aplicações remotas
+
+### Tunnel SOCKS5 (Proxy via Jump Host)
+
+O comando `sc tunnel` abre um tunnel SSH com um jump host e disponibiliza um proxy **SOCKS5** local. Com ele, o navegador (ou qualquer aplicação com suporte a SOCKS5) acessa a rede remota como se estivesse no jump host, similar ao `ssh -D`.
+
+**Sintaxe**:
+
+```bash
+sc tunnel -j <jump_host> [flags]
+```
+
+**Exemplos**:
+
+```bash
+# Abre o tunnel em background via jump host de índice 1 (localhost:4000)
+sc tunnel -j 1
+
+# Usa o jump host pelo nome e uma porta local específica
+sc tunnel -j production-jump --port 5000
+
+# Roda em foreground mostrando o tráfego (Ctrl+C encerra)
+sc tunnel -j 1 -v
+
+# Solicita senha / usa senha da variável SCPW / usa outro usuário
+sc tunnel -j 1 -a
+sc tunnel -j 1 -P
+sc tunnel -j 1 -u devops
+
+# Lista os tunnels ativos
+sc tunnel status
+
+# Encerra o tunnel de um jump host, ou todos
+sc tunnel stop -j 1
+sc tunnel stop
+```
+
+**Porta local do proxy** (em ordem de prioridade):
+
+1. Flag `--port`
+2. Campo `local_port_socks` do jump host no `config.yaml`
+3. Padrão: `4000`
+
+```yaml
+config:
+  jump_hosts:
+    - name: production-jump
+      host: bastion1.prod.com
+      user: ubuntu
+      port: 22
+      local_port_socks: 4000   # opcional
+```
+
+**Configurando o navegador**:
+
+- Proxy SOCKS5: `localhost` porta `4000` (ou a porta escolhida)
+- No Firefox, marque **"Proxy DNS ao usar SOCKS v5"** para que os nomes sejam resolvidos no jump host (permite acessar hosts internos pelo nome)
+- Teste via terminal: `curl --socks5-hostname localhost:4000 https://ifconfig.me`
+
+**Características**:
+
+- **Background por padrão**: o comando retorna assim que o tunnel está aberto; o log fica em `~/.sshControl/tunnels/<jump>.log`
+- **Foreground com `-v`**: exibe cada conexão (origem → destino, bytes e duração) e estatísticas ao encerrar
+- **Escuta apenas em `127.0.0.1`**: o proxy não fica exposto para outras máquinas da rede
+- **Keepalive**: a conexão SSH é mantida ativa; se cair, o tunnel é encerrado e o `sc tunnel status` deixa de listá-lo
+- **Um tunnel por jump host**: tentar abrir outro no mesmo jump host informa o tunnel já ativo
+- **Autenticação**: em background não há prompt de senha; se a chave SSH não estiver instalada, use `-a` ou `-P`
+
+**Rotas para alcançar o jump host**:
+
+Quando o jump host só é alcançável através de outro equipamento da rede local (ex.: a VPN está conectada em outra máquina), configure `routes` no jump host. Com `gateway` e `networks` preenchidos, o `sc tunnel` cria as rotas antes de abrir o tunnel e as remove quando ele é encerrado.
+
+```yaml
+config:
+  jump_hosts:
+    - name: main-jump
+      host: 10.177.165.25
+      user: ubuntu
+      port: 22
+      local_port_socks: 4000
+      routes:
+        gateway: 192.168.1.36      # Equipamento que alcança a rede do jump host
+        networks: [10.0.0.0/8]     # Redes em CIDR (um IP sem máscara vira /32)
+```
+
+- Os comandos usados são `route -n add -net <rede> <gateway>` (macOS) e `ip route add <rede> via <gateway>` (Linux), executados com `sudo` (a senha do sudo pode ser solicitada)
+- Rotas que já existiam antes do tunnel são mantidas e **não** são removidas no encerramento
+- Se alguma rota falhar, as já criadas são desfeitas e o tunnel não é aberto; o mesmo vale se a conexão SSH falhar
+- `sc tunnel stop` remove as rotas; em foreground (`-v`), elas são removidas ao pressionar Ctrl+C
+- Se o tunnel cair sozinho, ele tenta remover as rotas sem solicitar senha; se não conseguir, `sc tunnel status` mostra as rotas pendentes e `sc tunnel stop -j <jump>` as remove
 
 ### Autenticação
 
