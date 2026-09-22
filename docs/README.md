@@ -59,7 +59,19 @@ git push origin main
 
 ## Configuração
 
-Veja `GITHUB_PAGES_SETUP.md` na raiz do repositório para instruções completas de como configurar o GitHub Pages e o DNS customizado.
+Veja [`docs_int/GITHUB_PAGES_SETUP.md`](../docs_int/GITHUB_PAGES_SETUP.md) para instruções completas de como configurar o GitHub Pages e o DNS customizado.
+
+## Identidade Visual
+
+As cores e fontes ficam como variáveis no `:root` de `style.css`:
+
+- **Fundo**: lavanda claro (`--ground: #f2f1f7`), tema único
+- **Marca**: violeta (`--brand`), o mesmo tom do menu TUI (`#7D56F4` em `cmd/menu.go`)
+- **Sinal**: âmbar, usado só em estados ativos (prompt `$`, cursor, rota do tunnel, selos de versão)
+- **Terminais e caixas de comando**: sempre escuros (`--term-*`)
+- **Fontes** (Google Fonts): Martian Mono (títulos), Hanken Grotesk (texto), JetBrains Mono (código)
+
+As saídas mostradas nos terminais da página seguem o formato real impresso pelo `sc`. Ao mudar uma mensagem no código, atualize o exemplo correspondente no `index.html`.
 
 ## Manutenção
 

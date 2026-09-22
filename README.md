@@ -18,8 +18,10 @@ Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo
 - 📦 **Execução em Lote**: Execute comandos em múltiplos hosts simultaneamente, usando hosts diretos, tags ou arquivos texto
 - 🔐 **Autenticação Flexível**: Suporte para chaves SSH, SSH Agent e senha
 - 🔑 **Auto-Instalação de Chaves**: Instala automaticamente sua chave pública no servidor após primeira conexão
-- 🔒 **Controle de Senha**: Flag `-a` para solicitar senha antecipadamente (ideal para automações)
+- 🔒 **Controle de Senha**: Flag `-a` para solicitar senha antecipadamente e `-P` para ler a senha da variável `SCPW` (ideal para automações e CI/CD)
+- 🔢 **Seleção por Índice**: Usuários (`-u`) e jump hosts (`-j`) podem ser escolhidos pelo nome ou pelo índice exibido em `sc -s`
 - 📝 **Auto-Criação de Hosts**: Salva automaticamente hosts não cadastrados no config.yaml
+- 🧩 **Migração Automática do Config**: Novas chaves do template são adicionadas ao seu `config.yaml` sem alterar o que já existe
 - 📁 **Cópia de Arquivos**: Transferência de arquivos via SFTP com suporte a múltiplos hosts
 - 🚇 **Port Forward**: Encaminhe portas locais para remotas via túnel SSH (similar ao kubectl port-forward)
 - 🧦 **Tunnel SOCKS5**: Proxy SOCKS5 local via jump host para navegar pela rede remota (similar ao `ssh -D`)
@@ -93,37 +95,47 @@ config:
       host: jump.production.example.com
       user: ubuntu
       port: 22
+      local_port_socks: 4000      # Porta local do proxy SOCKS5 usada pelo 'sc tunnel' (opcional, padrão: 4000)
+      routes:                     # Rotas criadas pelo 'sc tunnel' para alcançar o jump host (opcional, requer sudo)
+        gateway: ""               # Equipamento que alcança a rede do jump host (ex: 192.168.1.36)
+        networks: []              # Redes em CIDR (ex: [10.0.0.0/8]). Só aplica com gateway e networks preenchidos
     - name: staging-jump
-      host: jump.staging.example.com
+      host: 10.20.0.10            # Alcançável apenas pela rota abaixo
       user: ubuntu
       port: 22
+      local_port_socks: 4001      # Porta diferente para poder abrir os dois tunnels ao mesmo tempo
+      routes:
+        gateway: 192.168.1.36     # Ex.: a VPN do staging está conectada em outra máquina da rede
+        networks: [10.20.0.0/16]
 
 hosts:
   - name: webserver
     host: 192.168.1.50
     port: 22
-    tags: 
+    tags:
       - web
       - production
   - name: database
     host: 192.168.1.51
     port: 22
-    tags: 
+    tags:
       - db
       - production
   - name: app-server
     host: 10.0.1.100
     port: 22
-    tags: 
+    tags:
       - app
-      -  production
+      - production
   - name: staging-web
     host: 10.0.2.50
     port: 22
-    tags: 
+    tags:
       - web
       - staging
 ```
+
+> **Migração automática**: ao iniciar, o sshControl compara o seu `config.yaml` com o template da versão instalada e adiciona as chaves que estiverem faltando (ex.: `local_port_socks` e `routes` em jump hosts antigos), com os valores padrão e comentários do template. Seus dados nunca são removidos ou sobrescritos.
 
 ## Uso
 
@@ -133,8 +145,9 @@ hosts:
 # Abre menu interativo
 sc
 
-# Menu com usuário específico (config.users[])
+# Menu com usuário específico (config.users[]), por nome ou índice
 sc -u admin
+sc -u2
 
 # Menu com Jump Host
 sc -j production-jump
@@ -180,6 +193,10 @@ sc -c "df -h" 192.168.1.50
 
 # Com jump host
 sc -j production-jump -c "systemctl status nginx" app-server
+
+# Com senha vinda da variável de ambiente SCPW (sem prompt)
+export SCPW='minha-senha'
+sc -P -c "uptime" webserver
 ```
 
 **Múltiplos hosts**:
@@ -222,14 +239,17 @@ sc -j 1 -c "systemctl status nginx" -l @web
 
 **Controle de Autenticação**:
 ```bash
-# Sem -a: tenta chave SSH, falha silenciosamente (ideal para automações/loops)
-for host in web1 web2 web3; do
-    sc -c "uptime" $host
-done
+# Sem -a/-P em múltiplos hosts: usa só chaves/agent, nunca pede senha (ideal para automações)
+sc -c "uptime" -l web1 web2 web3
 
 # Com -a: solicita senha uma vez antes de executar (quando chaves não estão instaladas)
 sc -a -c "uptime" -l web1 web2 web3
+
+# Com -P: usa a senha da variável SCPW, sem prompt (CI/CD, scripts)
+SCPW="$SENHA" sc -P -c "uptime" -l web1 web2 web3
 ```
+
+Veja a tabela completa em [Autenticação](#autenticação).
 
 ### Cópia de Arquivos (SFTP)
 
@@ -282,8 +302,9 @@ sc cp up -l @web ./deploy.sh /opt/
 - `-r, --recursive`: Copia diretórios recursivamente
 - `-l, --list`: Envia para múltiplos hosts (apenas `up`)
 - `-j, --jump <jump>`: Usa jump host
-- `-u, --user <user>`: Usa usuário específico
+- `-u, --user <user>`: Usa usuário específico (nome ou índice)
 - `-a, --ask-password`: Solicita senha antes
+- `-P, --env-password`: Usa a senha da variável de ambiente `SCPW`
 - `-v, --verbose`: Modo debug (informações detalhadas da conexão)
 
 ### Modo Debug (Verbose)
@@ -310,17 +331,25 @@ sc cp down -v webserver /var/log/app.log ./
 sc port-forward -v webserver 8080:80
 ```
 
-**Exemplo de saída**:
+**Exemplo de saída** (trecho):
 ```
+[DEBUG] Iniciando conexão interativa
 [DEBUG] Usuário: ubuntu
 [DEBUG] Host: 192.168.1.50:22
-[DEBUG] Chave SSH: ~/.ssh/id_rsa ... OK
-[DEBUG] Chave SSH: ~/.ssh/id_ed25519 ... falha ao ler arquivo
+[DEBUG] Criando configuração SSH...
+[DEBUG] Chave SSH: /home/voce/.ssh/id_rsa ... OK
+[DEBUG] Chave SSH: /home/voce/.ssh/id_ed25519 ... falha ao ler arquivo: open /home/voce/.ssh/id_ed25519: no such file or directory
+[DEBUG] SSH_AUTH_SOCK: /tmp/ssh-XXXXabc/agent.1234
 [DEBUG] SSH Agent: disponível
+[DEBUG] Senha: interativa (será solicitada se necessário)
 [DEBUG] Métodos de autenticação: [publickey (1 chave(s)), agent, password (interativa)]
 [DEBUG] Conectando diretamente a 192.168.1.50:22...
 [DEBUG] Conexão direta estabelecida
 [DEBUG] Conexão SSH estabelecida com sucesso
+[DEBUG] Chave pública carregada: /home/voce/.ssh/id_rsa.pub
+[DEBUG] Verificando instalação de 1 chave(s) pública(s) no servidor...
+[DEBUG] Todas as chaves públicas configuradas já estão instaladas no servidor
+[DEBUG] Criando sessão SSH...
 [DEBUG] Solicitando PTY (xterm-256color, 120x40)
 [DEBUG] Iniciando sessão interativa...
 ```
@@ -328,8 +357,11 @@ sc port-forward -v webserver 8080:80
 ### Comandos Úteis
 
 ```bash
-# Listar servidores e jump hosts cadastrados
+# Listar usuários, jump hosts e servidores cadastrados (com índices)
 sc -s
+
+# Listar apenas os usuários com seus índices
+sc -s @users
 
 # Listar servidores filtrados por tag
 sc -s @ansible
@@ -363,25 +395,27 @@ O sshControl automatiza a instalação de chaves públicas SSH nos servidores re
 
 **Como Funciona**:
 
-1. **Validação**: Na inicialização, verifica se os arquivos `.pub` existem para cada chave privada configurada
-2. **Primeira Conexão**: Ao conectar com senha (quando chave ainda não está instalada), automaticamente:
-   - Lê o arquivo `.pub` correspondente à chave privada
-   - Verifica se a chave já existe no `~/.ssh/authorized_keys` do servidor
-   - Se não existir, adiciona a chave com permissões corretas
+1. **Validação**: Ao conectar, verifica se os arquivos `.pub` existem para as chaves privadas do usuário em uso (apenas o usuário efetivo da conexão)
+2. **Após autenticar**: Em toda conexão bem-sucedida (senha, chave ou agent), automaticamente:
+   - Lê os arquivos `.pub` de **todas** as chaves configuradas para o usuário
+   - Verifica via SFTP se cada chave já existe no `~/.ssh/authorized_keys` do servidor
+   - Adiciona apenas as chaves ausentes, sem executar comandos no shell remoto
 3. **Próximas Conexões**: Autentica automaticamente via chave SSH (sem senha)
+
+A instalação é silenciosa: nada é exibido quando dá certo. Use `-v` para acompanhar (`Instalando 1 chave(s) pública(s) ausente(s)...`). Se a instalação falhar, a conexão continua normalmente (em conexões a um único host, um aviso é exibido).
 
 **Exemplo Prático**:
 
 ```bash
 # Primeira vez conectando ao servidor (sem chave instalada)
 sc -a webserver
-# Password for ubuntu@webserver: ********
-# ✅ Chave pública instalada com sucesso no servidor remoto
+# Password for ubuntu@192.168.1.50: ********
+# (a chave pública é instalada em ~/.ssh/authorized_keys e a sessão abre)
 
 # Próximas conexões já usam a chave (sem senha)
 sc webserver
 # 🔗 Conectando...
-#    ubuntu@192.168.1.50 (key: ~/.ssh/id_rsa)
+#    ubuntu@192.168.1.50 (key: /home/voce/.ssh/id_rsa)
 ```
 
 **Avisos**:
@@ -465,7 +499,7 @@ sc -c "systemctl restart mysql" -l @mysql
 No modo interativo, pressione `/` e digite o nome de uma tag para filtrar os hosts:
 
 ```
-Filtrar hosts...> production
+> production
 ```
 
 Mostrará apenas hosts que possuem a tag "production".
@@ -473,7 +507,7 @@ Mostrará apenas hosts que possuem a tag "production".
 Vários termos separados por espaço são combinados (todos devem coincidir). Use `@tag` para exigir a tag exata:
 
 ```
-Filtrar hosts...> @web @production
+> @web @production
 ```
 
 **Listagem e Filtro por Tags**:
@@ -585,6 +619,7 @@ config:
       host: bastion.staging.com
       user: ubuntu
       port: 22
+      local_port_socks: 4001 # opcional: porta do proxy SOCKS5 (ver "Tunnel SOCKS5")
 ```
 
 ```bash
@@ -593,6 +628,22 @@ sc -j production-jump webserver
 
 # Por índice
 sc -j 1 webserver
+```
+
+### Usuários por Nome ou Índice
+
+Assim como os jump hosts, os usuários de `config.users` podem ser escolhidos pelo nome ou pelo índice (1-based). Um valor só é tratado como índice quando é inteiramente numérico (`2fa` é resolvido como nome).
+
+```bash
+# Lista os usuários com seus índices
+sc -s @users
+
+# Por nome
+sc -u admin webserver
+
+# Por índice (com ou sem espaço)
+sc -u 2 webserver
+sc -u2 webserver
 ```
 
 ### Proxy Reverso
@@ -672,16 +723,21 @@ sc port-forward -a webserver 8080:80
 
 **Características**:
 
-- **Logs em tempo real**: Mostra cada conexão com origem, bytes transferidos e duração
+- **Logs em tempo real**: Mostra cada conexão com origem e bytes enviados/recebidos
 - **Estatísticas da sessão**: Ao encerrar (Ctrl+C), exibe total de conexões e bytes
-- **Suporte completo**: Jump hosts (`-j`), usuário específico (`-u`), senha (`-a`), debug (`-v`)
+- **Escuta em todas as interfaces** (`0.0.0.0`): outras máquinas da sua rede também podem usar a porta local
+- **Suporte completo**: Jump hosts (`-j`), usuário específico (`-u`), senha (`-a` ou `-P`), debug (`-v`)
 
 **Exemplo de saída**:
 
 ```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚇 Port Forward Ativo
-   Local:  127.0.0.1:8080
-   Remoto: 127.0.0.1:80 (via webserver)
+   Local:  0.0.0.0:8080
+   Remoto: 127.0.0.1:80 (via 192.168.1.50)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Pressione Ctrl+C para encerrar...
 
 📋 Log de conexões:
 ────────────────────────────────────────────────────────────────
@@ -790,42 +846,50 @@ config:
 ### Autenticação
 
 Ordem de tentativa de autenticação:
-1. Chave SSH (especificada no config)
+1. Chaves SSH (todas as chaves do usuário no config, em sequência)
 2. SSH Agent (se disponível)
-3. Senha (solicitada interativamente ou com `-a`)
+3. Senha (vinda de `-P`, de `-a` ou solicitada interativamente)
 
-**Controle de Senha com Flag `-a`**:
+**Quando a senha é solicitada**:
 
-A flag `-a` ou `--ask-password` permite controlar quando a senha é solicitada:
+| Modo | Sem `-a`/`-P` | Com `-a` | Com `-P` |
+|------|---------------|----------|----------|
+| Host único (`sc host`, `sc -c "..." host`) | Pedida no terminal se as chaves falharem | Pedida antes de conectar | Lida de `SCPW` |
+| Múltiplos hosts (`-l`) e `sc cp` | Nunca pedida: só chaves e agent | Pedida uma vez, usada em todos os hosts | Lida de `SCPW` |
+| `sc tunnel` em background | Nunca pedida | Pedida antes de abrir o tunnel | Lida de `SCPW` |
+
+**Flag `-a` (`--ask-password`)**: solicita a senha antes de tentar conectar.
 
 ```bash
-# Sem -a: senha solicitada interativamente como fallback (modo single host)
-sc webserver
-
-# Sem -a: em múltiplos hosts, tenta apenas chave SSH (ideal para automações)
-sc -c "uptime" -l web1 web2 web3
-
-# Com -a: solicita senha ANTES de tentar conectar
 sc -a webserver
 sc -a -c "uptime" -l web1 web2 web3
 ```
 
+**Flag `-P` (`--env-password`)**: lê a senha da variável de ambiente `SCPW`, sem nenhum prompt. Tem precedência sobre `-a` e interrompe a execução com erro se `SCPW` não estiver definida ou estiver vazia. Disponível em todos os modos: conexão direta, comando único, múltiplos hosts, `sc cp`, `sc port-forward` e `sc tunnel`.
+
+```bash
+export SCPW='minha-senha'
+sc -P -c "uptime" webserver
+sc -P -c "df -h" -l @production
+sc cp up -P -l @web ./deploy.sh /opt/
+```
+
 **Casos de Uso**:
 
-1. **Automações/Scripts**: Use SEM `-a` para não interromper loops
+1. **Automações/Scripts**: prefira `-l`, que nunca abre prompt de senha (hosts sem chave falham e aparecem no resumo), ou `-P` com a senha em `SCPW`
    ```bash
-   for host in web{1..10}; do
-       sc -c "uptime" $host  # Falha silenciosamente se chave não funcionar
-   done
+   sc -c "uptime" -l web1 web2 web3        # só chaves/agent, sem prompt
+   SCPW="$SENHA" sc -P -c "uptime" -l @web # CI/CD com senha de um secret
    ```
+   > Em host único sem `-a`/`-P`, a senha é pedida no terminal se as chaves falharem, o que interrompe um loop como `for h in ...; do sc -c "uptime" $h; done`.
 
-2. **Primeira Conexão**: Use COM `-a` quando chaves ainda não estão instaladas
+2. **Primeira Conexão**: Use `-a` quando as chaves ainda não estão instaladas
    ```bash
-   # Solicita senha uma vez, instala chave, próximas conexões sem senha
+   # Solicita senha uma vez, instala as chaves, próximas conexões sem senha
    sc -a -c "hostname" -l server1 server2 server3
    ```
 
-3. **Servidores Sem Chave**: Use COM `-a` quando precisa usar senha
+3. **Servidores Sem Chave**: Use `-a` (interativo) ou `-P` (automação)
    ```bash
    sc -a production-db
    ```
