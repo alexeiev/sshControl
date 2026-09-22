@@ -217,11 +217,12 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		errorMsg := err.Error()
 
 		// Se falhou por autenticação e não foi pedida senha (-a), sugere usar a flag
+		// Informa o usuário utilizado para facilitar identificar conexões com usuário errado
 		if !askPassword && password == "" && len(sshKeys) == 0 {
-			errorMsg += " (DICA: Use a opção -a ou --ask-password para fornecer senha)"
+			errorMsg += fmt.Sprintf(" (DICA: Usuário utilizado: '%s'. Use -u para escolher outro usuário ou -a/--ask-password para fornecer senha)", username)
 		} else if !askPassword && password == "" && len(sshKeys) > 0 {
 			// Tem chave configurada mas pode não estar instalada
-			errorMsg += " (DICA: Se a chave SSH não estiver instalada, use -a para fornecer senha)"
+			errorMsg += fmt.Sprintf(" (DICA: Usuário utilizado: '%s'. Se o usuário estiver incorreto, use -u para escolher outro; se a chave SSH não estiver instalada, use -a para fornecer senha)", username)
 		}
 
 		return HostResult{
