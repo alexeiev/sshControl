@@ -33,6 +33,9 @@ var (
 
 	// Flags do comando cp
 	cpRecursive bool
+
+	// Flag do comando tunnel
+	tunnelPort int
 )
 
 var rootCmd = &cobra.Command{
@@ -107,6 +110,58 @@ O terminal permanece ativo mostrando logs das conexões até que Ctrl+C seja pre
   sc port-forward -u deploy app-server 9000:8080`,
 	Args: cobra.ExactArgs(2),
 	Run:  runPortForward,
+}
+
+var tunnelCmd = &cobra.Command{
+	Use:   "tunnel -j <jump_host> [flags]",
+	Short: "Abre um tunnel SSH com proxy SOCKS5 local via jump host",
+	Long: `Abre um tunnel SSH com o jump host informado e disponibiliza um proxy SOCKS5
+local (padrão: localhost:4000) para ser usado no navegador ou em outras aplicações.
+
+O tunnel roda em background. Use -v para rodar em foreground exibindo o tráfego.
+
+Porta local do proxy (em ordem de prioridade):
+  1. Flag --port
+  2. Campo local_port_socks do jump host no config.yaml
+  3. Padrão: 4000
+
+A resolução de nomes (DNS) é feita no jump host, permitindo acessar
+hosts internos da rede remota pelo nome.
+
+Se o jump host tiver routes (gateway + networks) no config.yaml, as rotas
+são criadas antes do tunnel (via sudo) e removidas pelo 'sc tunnel stop'.`,
+	Example: `  # Abre tunnel via jump host de índice 1 (background)
+  sc tunnel -j 1
+
+  # Abre tunnel via jump host por nome, em porta específica
+  sc tunnel -j production-jump --port 5000
+
+  # Roda em foreground mostrando o tráfego (Ctrl+C encerra)
+  sc tunnel -j 1 -v
+
+  # Solicita senha antes de conectar
+  sc tunnel -j 1 -a
+
+  # Lista e encerra tunnels em background
+  sc tunnel status
+  sc tunnel stop -j 1
+  sc tunnel stop`,
+	Args: cobra.NoArgs,
+	Run:  runTunnel,
+}
+
+var tunnelStopCmd = &cobra.Command{
+	Use:   "stop [-j <jump_host>]",
+	Short: "Encerra tunnels em background (todos, se -j não for informado)",
+	Args:  cobra.NoArgs,
+	Run:   runTunnelStop,
+}
+
+var tunnelStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Lista os tunnels ativos em background",
+	Args:  cobra.NoArgs,
+	Run:   runTunnelStatus,
 }
 
 var cpDownCmd = &cobra.Command{
@@ -336,6 +391,38 @@ PORT FORWARD (Túnel SSH)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+TUNNEL SOCKS5 (Proxy via Jump Host)
+  Abre um tunnel SSH com um jump host e disponibiliza um proxy SOCKS5 local
+  para o navegador (padrão: localhost:4000). Roda em background.
+
+  Sintaxe: sc tunnel -j <jump_host> [flags]
+
+  Exemplos:
+  sc tunnel -j 1                          Abre tunnel em background (localhost:4000)
+  sc tunnel -j production-jump --port 5000
+                                          Usa a porta local 5000
+  sc tunnel -j 1 -v                       Foreground exibindo o tráfego (Ctrl+C encerra)
+  sc tunnel -j 1 -a                       Solicita senha antes de conectar
+  sc tunnel status                        Lista tunnels ativos
+  sc tunnel stop -j 1                     Encerra o tunnel do jump host 1
+  sc tunnel stop                          Encerra todos os tunnels
+
+  Porta local: --port > local_port_socks do jump host > 4000
+  O DNS é resolvido no jump host (use "SOCKS5 proxy DNS" no navegador).
+
+  Rotas: se o jump host só é alcançável por outro equipamento (ex: VPN em
+  outra máquina), configure routes no jump host. As rotas são criadas (via
+  sudo) antes do tunnel e removidas pelo 'sc tunnel stop':
+
+  jump_hosts:
+    - name: main-jump
+      host: 10.177.165.25
+      routes:
+        gateway: 192.168.1.36
+        networks: [10.0.0.0/8]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 COMANDOS ÚTEIS
   sc -s                     Lista usuários, jump hosts e servidores cadastrados
   sc -s @tag                Lista servidores filtrados por tag
@@ -345,6 +432,7 @@ COMANDOS ÚTEIS
   sc update                 Atualiza para versão mais recente
   sc cp                     Copia arquivos via SFTP (veja sc cp --help)
   sc port-forward           Encaminha porta local para remota (veja sc port-forward --help)
+  sc tunnel                 Proxy SOCKS5 local via jump host (veja sc tunnel --help)
   sc man                    Exibe este manual
   sc --help                 Exibe ajuda rápida
 
@@ -399,6 +487,9 @@ func init() {
 	rootCmd.AddCommand(manCmd)
 	rootCmd.AddCommand(cpCmd)
 	rootCmd.AddCommand(pfCmd)
+	rootCmd.AddCommand(tunnelCmd)
+	tunnelCmd.AddCommand(tunnelStopCmd)
+	tunnelCmd.AddCommand(tunnelStatusCmd)
 	cpCmd.AddCommand(cpDownCmd)
 	cpCmd.AddCommand(cpUpCmd)
 
@@ -430,6 +521,15 @@ func init() {
 	pfCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
 	pfCmd.Flags().BoolVarP(&envPassword, "env-password", "P", false, "Usa a senha da variável de ambiente SCPW (sem prompt)")
 	pfCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Modo debug: exibe informações detalhadas da conexão")
+
+	// Flags do comando tunnel
+	tunnelCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host a usar no tunnel (nome ou índice) - obrigatório")
+	tunnelCmd.Flags().StringVarP(&username, "user", "u", "", "Usuário da configuração a ser usado (nome ou índice). Padrão: usuário do jump host")
+	tunnelCmd.Flags().IntVar(&tunnelPort, "port", cmd.DefaultSOCKSPort, "Porta local do proxy SOCKS5 (sobrepõe local_port_socks do jump host)")
+	tunnelCmd.Flags().BoolVarP(&askPassword, "ask-password", "a", false, "Solicita senha antes de tentar autenticação")
+	tunnelCmd.Flags().BoolVarP(&envPassword, "env-password", "P", false, "Usa a senha da variável de ambiente SCPW (sem prompt)")
+	tunnelCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Roda em foreground exibindo o tráfego e detalhes da conexão")
+	tunnelStopCmd.Flags().StringVarP(&jumpHost, "jump", "j", "", "Jump host do tunnel a encerrar (nome ou índice)")
 }
 
 func runCommand(cobraCmd *cobra.Command, args []string) {
@@ -1150,6 +1250,188 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 		fmt.Fprintf(os.Stderr, "\nErro: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// loadConfigOrExit inicializa e carrega o config.yaml, encerrando em caso de erro
+func loadConfigOrExit() (string, *config.ConfigFile) {
+	configPath, err := config.InitializeConfigDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao inicializar configuração: %v\n", err)
+		os.Exit(1)
+	}
+
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao carregar %s: %v\n", configPath, err)
+		os.Exit(1)
+	}
+	return configPath, cfg
+}
+
+func runTunnel(cobraCmd *cobra.Command, args []string) {
+	configPath, cfg := loadConfigOrExit()
+
+	if jumpHost == "" {
+		fmt.Fprintf(os.Stderr, "Erro: Informe o jump host do tunnel com -j (nome ou índice)\n")
+		printJumpHostOptions(cfg)
+		os.Exit(1)
+	}
+
+	selectedJumpHost := cfg.ResolveJumpHost(jumpHost)
+	if selectedJumpHost == nil {
+		fmt.Fprintf(os.Stderr, "Erro: Jump host '%s' não encontrado\n", jumpHost)
+		printJumpHostOptions(cfg)
+		os.Exit(1)
+	}
+
+	// Porta local: --port > local_port_socks do jump host > padrão
+	localPort := cmd.DefaultSOCKSPort
+	if selectedJumpHost.LocalPortSOCKS > 0 {
+		localPort = selectedJumpHost.LocalPortSOCKS
+	}
+	if cobraCmd.Flags().Changed("port") {
+		localPort = tunnelPort
+	}
+	if localPort < 1 || localPort > 65535 {
+		fmt.Fprintf(os.Stderr, "Erro: Porta local inválida: %d (deve ser entre 1 e 65535)\n", localPort)
+		os.Exit(1)
+	}
+
+	// Usuário: -u sobrepõe o usuário configurado no jump host
+	usernameToUse := selectedJumpHost.User
+	sshKeys := cfg.GetJumpHostSSHKeys(selectedJumpHost)
+	if username != "" || usernameToUse == "" {
+		var selectedUser *config.User
+		if username != "" {
+			selectedUser = cfg.ResolveUser(username)
+			if selectedUser == nil {
+				fmt.Fprintf(os.Stderr, "Erro: Usuário '%s' não encontrado no config.yaml\n", username)
+				os.Exit(1)
+			}
+		}
+		effectiveUser := cfg.GetEffectiveUser(selectedUser)
+		if effectiveUser == nil {
+			fmt.Fprintf(os.Stderr, "Erro: Nenhum usuário configurado\n")
+			os.Exit(1)
+		}
+		config.ValidateEffectiveUserSSHKeys(effectiveUser)
+		usernameToUse = effectiveUser.Name
+		sshKeys = nil
+		for _, key := range effectiveUser.SSHKeys {
+			sshKeys = append(sshKeys, config.ExpandHomePath(key))
+		}
+	}
+
+	port := selectedJumpHost.Port
+	if port == 0 {
+		port = 22
+	}
+
+	// No processo em background, a senha chega pelo stdin enviada pelo processo pai
+	isDaemon := os.Getenv(cmd.TunnelDaemonEnv) == "1"
+	var password string
+	var err error
+	if isDaemon {
+		password, err = cmd.ReadDaemonPassword()
+	} else {
+		password, err = cmd.ResolvePassword(askPassword, envPassword, fmt.Sprintf("Password for %s@%s: ", usernameToUse, selectedJumpHost.Host))
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+		os.Exit(1)
+	}
+
+	sshConn := cmd.NewSSHConnection(
+		usernameToUse,
+		selectedJumpHost.Host,
+		port,
+		sshKeys,
+		password,
+		nil, // O próprio jump host é o destino do tunnel
+		nil,
+		"",
+		false,
+		"",
+		0,
+		verbose,
+	)
+	session := cmd.NewTunnelSession(sshConn, selectedJumpHost.Name, localPort)
+	stateDir := cmd.TunnelStateDir(configPath)
+
+	// Rotas para alcançar o jump host (criadas antes do tunnel; o processo em background não as cria)
+	if !isDaemon {
+		routes, err := cmd.ParseTunnelRoutes(selectedJumpHost)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
+			os.Exit(1)
+		}
+		session.Routes = routes
+	}
+
+	switch {
+	case isDaemon:
+		// Em background não há terminal para solicitar senha
+		sshConn.InteractivePasswordAllowed = false
+		if err := session.RunDaemon(stateDir); err != nil {
+			os.Exit(1)
+		}
+	case verbose:
+		if err := session.RunForeground(stateDir); err != nil {
+			fmt.Fprintf(os.Stderr, "\n❌ Erro: %v\n", err)
+			printTunnelAuthHint(err, usernameToUse, password)
+			os.Exit(1)
+		}
+	default:
+		if err := session.StartBackground(stateDir, os.Args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "\n❌ Erro: %v\n", err)
+			printTunnelAuthHint(err, usernameToUse, password)
+			os.Exit(1)
+		}
+	}
+}
+
+// printTunnelAuthHint exibe dica quando a autenticação do tunnel falha sem senha informada
+func printTunnelAuthHint(err error, user, password string) {
+	if password != "" || !strings.Contains(err.Error(), "unable to authenticate") {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "   DICA: Usuário utilizado: '%s'. Se o usuário estiver incorreto, use -u para escolher outro; se a chave SSH não estiver instalada, use -a para fornecer senha\n", user)
+}
+
+// printJumpHostOptions lista os jump hosts disponíveis para uso com -j
+func printJumpHostOptions(cfg *config.ConfigFile) {
+	if len(cfg.Config.JumpHosts) == 0 {
+		fmt.Fprintf(os.Stderr, "Nenhum jump host cadastrado no config.yaml\n")
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Jump hosts disponíveis:\n")
+	for i, jh := range cfg.Config.JumpHosts {
+		fmt.Fprintf(os.Stderr, "  %d. %s (%s@%s:%d)\n", i+1, jh.Name, jh.User, jh.Host, jh.Port)
+	}
+}
+
+func runTunnelStop(cobraCmd *cobra.Command, args []string) {
+	configPath, cfg := loadConfigOrExit()
+
+	// Aceita nome ou índice; se o jump host não existir mais no config, usa o nome informado
+	name := jumpHost
+	if jumpHost != "" {
+		if jh := cfg.ResolveJumpHost(jumpHost); jh != nil {
+			name = jh.Name
+		}
+	}
+
+	fmt.Println()
+	if err := cmd.StopTunnels(cmd.TunnelStateDir(configPath), name); err != nil {
+		fmt.Fprintf(os.Stderr, "ℹ️  %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println()
+}
+
+func runTunnelStatus(cobraCmd *cobra.Command, args []string) {
+	configPath, _ := loadConfigOrExit()
+	cmd.PrintTunnelStatus(cmd.TunnelStateDir(configPath))
 }
 
 func main() {

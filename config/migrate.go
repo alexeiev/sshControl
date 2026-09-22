@@ -110,7 +110,8 @@ func mergeNodes(dst, src *yaml.Node) bool {
 
 // mergeSequenceItems verifica itens de uma lista do usuário contra o "esquema" do template.
 // Para cada item (mapping) da lista do usuário, adiciona campos que existem no template mas faltam no item.
-// Campos adicionados recebem valores default vazios (ex: tags: []).
+// Campos adicionados recebem valores default (ex: tags: [], local_port_socks: 4000).
+// Também corrige campos não-texto gravados como "" por versões anteriores da migração.
 func mergeSequenceItems(dst, src *yaml.Node) bool {
 	// Precisa ter pelo menos um item no template para extrair o esquema
 	if len(src.Content) == 0 {
@@ -136,12 +137,27 @@ func mergeSequenceItems(dst, src *yaml.Node) bool {
 			tmplKey := templateItem.Content[i]
 			tmplVal := templateItem.Content[i+1]
 
-			// Se o campo não existe no item do usuário, adiciona com valor default vazio
-			if findKeyIndex(dstItem, tmplKey.Value) == -1 {
+			// Se o campo não existe no item do usuário, adiciona com valor default
+			idx := findKeyIndex(dstItem, tmplKey.Value)
+			if idx == -1 {
 				keyCopy := copyNode(tmplKey)
 				valCopy := emptyValueNode(tmplVal)
 				dstItem.Content = append(dstItem.Content, keyCopy, valCopy)
 				changed = true
+				continue
+			}
+
+			dstVal := dstItem.Content[idx+1]
+			switch {
+			case isEmptyString(dstVal) && isTypedScalar(tmplVal):
+				// Campo numérico/booleano com valor "" quebra o parse do YAML: usa o default do template
+				dstItem.Content[idx+1] = emptyValueNode(tmplVal)
+				changed = true
+			case dstVal.Kind == yaml.MappingNode && tmplVal.Kind == yaml.MappingNode:
+				// Objeto aninhado (ex: routes): completa os campos faltantes com valores vazios
+				if mergeEmptyFields(dstVal, tmplVal) {
+					changed = true
+				}
 			}
 		}
 	}
@@ -149,9 +165,41 @@ func mergeSequenceItems(dst, src *yaml.Node) bool {
 	return changed
 }
 
-// emptyValueNode cria um nó yaml com valor default vazio baseado no tipo do nó de referência.
-// Sequências viram [], mappings viram {}, escalares viram "".
+// mergeEmptyFields adiciona ao mapping do usuário os campos do template que faltam, com valores vazios
+func mergeEmptyFields(dst, src *yaml.Node) bool {
+	changed := false
+	for i := 0; i < len(src.Content)-1; i += 2 {
+		srcKey := src.Content[i]
+		srcVal := src.Content[i+1]
+
+		idx := findKeyIndex(dst, srcKey.Value)
+		if idx == -1 {
+			dst.Content = append(dst.Content, copyNode(srcKey), emptyValueNode(srcVal))
+			changed = true
+			continue
+		}
+		if dstVal := dst.Content[idx+1]; dstVal.Kind == yaml.MappingNode && srcVal.Kind == yaml.MappingNode {
+			if mergeEmptyFields(dstVal, srcVal) {
+				changed = true
+			}
+		}
+	}
+	return changed
+}
+
+// emptyValueNode cria um nó yaml com valor default baseado no tipo do nó de referência.
+// Sequências viram [], textos viram "", escalares tipados (números, booleanos) recebem
+// o valor do template (pois "" não é válido para eles) e mappings mantêm os campos do
+// template com valores vazios (ex: routes: {gateway: "", networks: []}).
 func emptyValueNode(ref *yaml.Node) *yaml.Node {
+	if isTypedScalar(ref) {
+		return &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   ref.ShortTag(),
+			Value: ref.Value,
+		}
+	}
+
 	switch ref.Kind {
 	case yaml.SequenceNode:
 		return &yaml.Node{
@@ -160,11 +208,17 @@ func emptyValueNode(ref *yaml.Node) *yaml.Node {
 			Style: yaml.FlowStyle,
 		}
 	case yaml.MappingNode:
-		return &yaml.Node{
-			Kind:  yaml.MappingNode,
-			Tag:   "!!map",
-			Style: yaml.FlowStyle,
+		node := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
 		}
+		if len(ref.Content) == 0 {
+			node.Style = yaml.FlowStyle
+		}
+		for i := 0; i < len(ref.Content)-1; i += 2 {
+			node.Content = append(node.Content, copyNode(ref.Content[i]), emptyValueNode(ref.Content[i+1]))
+		}
+		return node
 	default:
 		return &yaml.Node{
 			Kind:  yaml.ScalarNode,
@@ -172,6 +226,23 @@ func emptyValueNode(ref *yaml.Node) *yaml.Node {
 			Value: "",
 		}
 	}
+}
+
+// isTypedScalar indica se o nó é um escalar não-texto (int, float, bool)
+func isTypedScalar(node *yaml.Node) bool {
+	if node.Kind != yaml.ScalarNode {
+		return false
+	}
+	switch node.ShortTag() {
+	case "!!int", "!!float", "!!bool":
+		return true
+	}
+	return false
+}
+
+// isEmptyString indica se o nó é um escalar de texto vazio ("")
+func isEmptyString(node *yaml.Node) bool {
+	return node.Kind == yaml.ScalarNode && node.Value == "" && node.ShortTag() == "!!str"
 }
 
 // findKeyIndex procura uma chave em um MappingNode e retorna o índice dela.

@@ -17,10 +17,24 @@ type User struct {
 
 // JumpHost representa um jump host configurado
 type JumpHost struct {
-	Name string `yaml:"name"`
-	Host string `yaml:"host"`
-	User string `yaml:"user"`
-	Port int    `yaml:"port"`
+	Name           string          `yaml:"name"`
+	Host           string          `yaml:"host"`
+	User           string          `yaml:"user"`
+	Port           int             `yaml:"port"`
+	LocalPortSOCKS int             `yaml:"local_port_socks,omitempty"` // Porta local do proxy SOCKS5 usada pelo 'sc tunnel' (padrão: 4000)
+	Routes         *JumpHostRoutes `yaml:"routes,omitempty"`           // Rotas criadas antes do 'sc tunnel' para alcançar o jump host
+}
+
+// JumpHostRoutes define rotas estáticas necessárias para alcançar o jump host
+// (ex: quando a VPN está em outro equipamento da rede local)
+type JumpHostRoutes struct {
+	Gateway  string   `yaml:"gateway,omitempty"`  // Gateway das rotas (ex: 192.168.1.36)
+	Networks []string `yaml:"networks,omitempty"` // Redes em notação CIDR (ex: 10.0.0.0/8)
+}
+
+// HasRoutes indica se o jump host possui gateway e redes configurados
+func (j *JumpHost) HasRoutes() bool {
+	return j.Routes != nil && j.Routes.Gateway != "" && len(j.Routes.Networks) > 0
 }
 
 // Config representa a seção de configuração global
