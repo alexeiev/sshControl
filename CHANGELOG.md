@@ -11,6 +11,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Checks de qualidade na CI com `golangci-lint`: relatório completo como artefato e bloqueio de novas ocorrências em pushes e Pull Requests
 - Auditoria de vulnerabilidades alcançáveis com `govulncheck` na CI
+- Análise CodeQL de Go e GitHub Actions em pushes, Pull Requests e execuções semanais, com resultados no Code scanning do GitHub
+- Badge do workflow CodeQL no README
 
 ### Changed
 
