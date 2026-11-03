@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Go Test
@@ -20,8 +23,68 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
+          go-version: '1.26'
+          check-latest: true
           cache-dependency-path: go.sum
 
       - name: Run tests
         run: go test ./...
+
+  lint:
+    name: Golangci-lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Obter código e histórico
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Preparar Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache-dependency-path: go.sum
+
+      - name: Instalar golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+          install-only: true
+
+      - name: Auditar todo o código
+        id: audit
+        run: golangci-lint run --issues-exit-code=0 --output.json.path="$RUNNER_TEMP/golangci-lint.json"
+
+      - name: Publicar relatório completo de lint
+        if: always() && steps.audit.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: golangci-lint-report
+          path: ${{ runner.temp }}/golangci-lint.json
+          if-no-files-found: error
+
+      - name: Bloquear novos problemas de lint
+        env:
+          LINT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: golangci-lint run --new-from-rev="$LINT_BASE"
+
+  vulnerabilities:
+    name: Govulncheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v7
+
+      - name: Preparar Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          check-latest: true
+          cache-dependency-path: go.sum
+
+      - name: Instalar govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+
+      - name: Auditar vulnerabilidades alcançáveis
+        run: govulncheck ./...

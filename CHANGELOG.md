@@ -5,6 +5,21 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Added
+
+- Checks de qualidade na CI com `golangci-lint`: relatório completo como artefato e bloqueio de novas ocorrências em pushes e Pull Requests
+- Auditoria de vulnerabilidades alcançáveis com `govulncheck` na CI
+
+### Changed
+
+- Versão mínima do Go atualizada para 1.26; CI e release usam o patch mais recente da série 1.26
+
+### Security
+
+- Atualiza `golang.org/x/crypto` de v0.46.0 para v0.56.0 e suas dependências para corrigir sete vulnerabilidades alcançáveis em SSH identificadas pelo `govulncheck`
+
 ## [1.1.0] - 2026-11-03
 
 ### Added
