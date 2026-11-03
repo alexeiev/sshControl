@@ -1026,6 +1026,29 @@ go run .
 VERSION=v1.1.0 make build
 ```
 
+### Qualidade e segurança na CI
+
+A CI executa três checks em pushes para `main` e em Pull Requests: testes Go, `golangci-lint` e `govulncheck`. As ferramentas são gratuitas e não precisam de conta ou token externo.
+
+- **golangci-lint v2.15.0**: usa as regras de `.golangci.yml` (`errcheck`, `govet`, `ineffassign`, `staticcheck` e `unused`). Cada execução disponibiliza o relatório JSON completo no artefato `golangci-lint-report`. Os apontamentos existentes continuam visíveis; novas ocorrências nas linhas alteradas fazem o check falhar, comparando com a base do PR ou com o commit anterior ao push.
+- **govulncheck v1.9.0**: consulta a base de vulnerabilidades do Go e falha quando encontra vulnerabilidades conhecidas alcançáveis pelo código. Também informa problemas em dependências que não parecem ser chamados pelo projeto.
+
+Para executar localmente, use Go 1.26 com o patch mais recente e instale `golangci-lint` v2.15.0 pelos [binários oficiais](https://golangci-lint.run/docs/welcome/install/local/):
+
+```bash
+go test ./...
+
+# Auditoria completa: retorna erro enquanto houver apontamentos existentes
+golangci-lint run
+
+# Apenas novas ocorrências em relação à main
+git fetch origin
+golangci-lint run --new-from-rev=origin/main
+
+go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+govulncheck ./...
+```
+
 ### Criar uma Release
 
 ```bash
@@ -1047,7 +1070,7 @@ O GitHub Actions automaticamente:
 
 ## Requisitos
 
-- Go 1.25+ (para compilar)
+- Go 1.26+ (para compilar; use o patch mais recente)
 - Acesso SSH aos hosts desejados
 - Git (para versionamento durante build)
 
