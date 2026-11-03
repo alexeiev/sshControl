@@ -17,6 +17,19 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+func TestTunnelStateDirIgnoresSCCONFIG(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, configPath := range []string{"", filepath.Join(t.TempDir(), "producao.yaml")} {
+		t.Setenv("SCCONFIG", configPath)
+		got, err := TunnelStateDir()
+		want := filepath.Join(home, ".sshControl", "tunnels")
+		if err != nil || got != want {
+			t.Fatalf("TunnelStateDir() = %q, %v; esperado %q", got, err, want)
+		}
+	}
+}
+
 // socks5Connect executa o lado cliente do SOCKS5 (sem autenticação, CONNECT por domínio)
 func socks5Connect(t *testing.T, conn net.Conn, host string, port int) byte {
 	t.Helper()

@@ -244,8 +244,11 @@ AUTOR
   @alexeiev
 
 CONFIGURAÇÃO
-  O arquivo de configuração fica em: ~/.sshControl/config.yaml
-  Na primeira execução, um template é criado automaticamente.
+  Por padrão, o arquivo de configuração fica em: ~/.sshControl/config.yaml
+  Para usar outro arquivo, defina: export SCCONFIG=/diretorio-local/config.yaml
+  Se SCCONFIG estiver ausente ou vazia, o caminho padrão será usado.
+  Se o arquivo escolhido não existir, um template será criado automaticamente.
+  Os logs e o estado dos tunnels permanecem em ~/.sshControl/tunnels.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1269,7 +1272,7 @@ func loadConfigOrExit() (string, *config.ConfigFile) {
 }
 
 func runTunnel(cobraCmd *cobra.Command, args []string) {
-	configPath, cfg := loadConfigOrExit()
+	_, cfg := loadConfigOrExit()
 
 	if jumpHost == "" {
 		fmt.Fprintf(os.Stderr, "Erro: Informe o jump host do tunnel com -j (nome ou índice)\n")
@@ -1356,7 +1359,7 @@ func runTunnel(cobraCmd *cobra.Command, args []string) {
 		verbose,
 	)
 	session := cmd.NewTunnelSession(sshConn, selectedJumpHost.Name, localPort)
-	stateDir := cmd.TunnelStateDir(configPath)
+	stateDir := tunnelStateDirOrExit()
 
 	// Rotas para alcançar o jump host (criadas antes do tunnel; o processo em background não as cria)
 	if !isDaemon {
@@ -1411,7 +1414,7 @@ func printJumpHostOptions(cfg *config.ConfigFile) {
 }
 
 func runTunnelStop(cobraCmd *cobra.Command, args []string) {
-	configPath, cfg := loadConfigOrExit()
+	_, cfg := loadConfigOrExit()
 
 	// Aceita nome ou índice; se o jump host não existir mais no config, usa o nome informado
 	name := jumpHost
@@ -1422,7 +1425,7 @@ func runTunnelStop(cobraCmd *cobra.Command, args []string) {
 	}
 
 	fmt.Println()
-	if err := cmd.StopTunnels(cmd.TunnelStateDir(configPath), name); err != nil {
+	if err := cmd.StopTunnels(tunnelStateDirOrExit(), name); err != nil {
 		fmt.Fprintf(os.Stderr, "ℹ️  %v\n", err)
 		os.Exit(1)
 	}
@@ -1430,8 +1433,17 @@ func runTunnelStop(cobraCmd *cobra.Command, args []string) {
 }
 
 func runTunnelStatus(cobraCmd *cobra.Command, args []string) {
-	configPath, _ := loadConfigOrExit()
-	cmd.PrintTunnelStatus(cmd.TunnelStateDir(configPath))
+	loadConfigOrExit()
+	cmd.PrintTunnelStatus(tunnelStateDirOrExit())
+}
+
+func tunnelStateDirOrExit() string {
+	stateDir, err := cmd.TunnelStateDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao obter diretório dos tunnels: %v\n", err)
+		os.Exit(1)
+	}
+	return stateDir
 }
 
 func main() {

@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alexeiev/sshControl/config"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -468,9 +469,13 @@ type TunnelInfo struct {
 	Port int
 }
 
-// TunnelStateDir retorna o diretório onde ficam os arquivos de PID e log dos tunnels
-func TunnelStateDir(configPath string) string {
-	return filepath.Join(filepath.Dir(configPath), "tunnels")
+// TunnelStateDir retorna o diretório fixo de estado e logs, independente de SCCONFIG.
+func TunnelStateDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("erro ao obter diretório home: %w", err)
+	}
+	return filepath.Join(homeDir, config.ConfigDirName, "tunnels"), nil
 }
 
 func tunnelFileBase(stateDir, name string) string {
