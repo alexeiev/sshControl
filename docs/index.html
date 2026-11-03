@@ -425,6 +425,11 @@ export {https,http,ftp}_proxy=http://127.0.0.1:9999</pre>
                     <h4><code>-v</code> Modo debug</h4>
                     <p>Mostra os métodos de autenticação, o status de cada chave, o caminho via jump host e o PTY. Tudo vai para o stderr.</p>
                 </div>
+                <div class="item">
+                    <h4>Identidade dos servidores SSH</h4>
+                    <p>Valida servidores e jump hosts em <code>~/.ssh/known_hosts</code>. Chaves desconhecidas exigem confirmação no terminal; lotes e tunnels em background precisam de cadastro prévio. Para cadastrar a chave de um tunnel, conecte primeiro com <code>-v</code>.</p>
+                    <p>Após conferir o fingerprint, <code>--ignore-host-key</code> permite uma chave divergente somente naquela execução, com aviso e sem substituir o cadastro. Chaves desconhecidas e revogadas continuam protegidas.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -520,6 +525,7 @@ export {https,http,ftp}_proxy=http://127.0.0.1:9999</pre>
                         <tr><td>-p, --proxy</td><td>Proxy reverso para o host remoto</td></tr>
                         <tr><td>-a, --ask-password</td><td>Pede a senha antes de conectar</td></tr>
                         <tr><td>-P, --env-password</td><td>Usa a senha da variável <code>SCPW</code></td></tr>
+                        <tr><td>--ignore-host-key</td><td>Permite chave SSH divergente nesta execução, com aviso e sem alterar <code>known_hosts</code></td></tr>
                         <tr><td>-v, --verbose</td><td>Modo debug (no <code>tunnel</code>, roda em foreground)</td></tr>
                         <tr><td>-V, --version</td><td>Versão, data do build e commit</td></tr>
                         <tr class="ref-group"><td colspan="2">Variáveis de ambiente</td></tr>

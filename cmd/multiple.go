@@ -25,7 +25,7 @@ type HostResult struct {
 }
 
 // ConnectMultiple executa um comando em múltiplos hosts em paralelo
-func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, envPassword bool, verbose bool) {
+func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []string, selectedUser *config.User, jumpHost *config.JumpHost, command string, proxyEnabled bool, askPassword bool, envPassword bool, verbose bool, hostKeys ...HostKeyOptions) {
 	// Determina o usuário efetivo
 	effectiveUser := cfg.GetEffectiveUser(selectedUser)
 	if effectiveUser == nil {
@@ -106,7 +106,7 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 		wg.Add(1)
 		go func(hostArg string) {
 			defer wg.Done()
-			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command, proxyActive, proxyAddress, proxyPort, askPassword, verbose)
+			result := executeOnHost(cfg, hostArg, effectiveUser, jumpHost, password, command, proxyActive, proxyAddress, proxyPort, askPassword, verbose, hostKeys...)
 			results <- result
 		}(hostArg)
 	}
@@ -136,7 +136,7 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 }
 
 // executeOnHost executa o comando em um único host e retorna o resultado
-func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, askPassword bool, verbose bool) HostResult {
+func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config.User, jumpHost *config.JumpHost, password string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, askPassword bool, verbose bool, hostKeys ...HostKeyOptions) HostResult {
 	var hostname string
 	var port int
 	var sshKeys []string
@@ -205,6 +205,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		proxyAddress,
 		proxyPort,
 		verbose,
+		hostKeys...,
 	)
 
 	// Em modo múltiplos hosts, desabilita prompt interativo de senha

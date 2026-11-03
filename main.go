@@ -30,6 +30,7 @@ var (
 	askPassword   bool
 	envPassword   bool
 	verbose       bool
+	ignoreHostKey bool
 
 	// Flags do comando cp
 	cpRecursive bool
@@ -450,6 +451,7 @@ FLAGS DISPONÍVEIS
   -p, --proxy               Habilita proxy reverso
   -a, --ask-password        Solicita senha antes de conectar
   -P, --env-password        Usa a senha da variável de ambiente SCPW
+      --ignore-host-key     Ignora chave SSH divergente somente nesta execução
   -v, --verbose             Modo debug (informações detalhadas da conexão)
   -V, --version             Exibe versão
   -h, --help                Exibe ajuda
@@ -457,6 +459,14 @@ FLAGS DISPONÍVEIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 AUTENTICAÇÃO
+  As chaves dos servidores e jump hosts são validadas em ~/.ssh/known_hosts.
+  Servidor desconhecido: pede confirmação no terminal antes de salvar a chave.
+  Sem terminal, em lotes e em tunnels em background, exige cadastro prévio.
+  Para cadastrar a chave de um tunnel, conecte primeiro com sc tunnel -j 1 -v.
+  Chave diferente: recusa a conexão. Após verificar a identidade do servidor,
+  --ignore-host-key permite ignorar a divergência somente nesta execução,
+  com aviso e sem alterar known_hosts. Chaves revogadas continuam bloqueadas.
+
   Ordem de tentativa:
   1. Chave SSH (configurada no config.yaml)
   2. SSH Agent (se disponível)
@@ -486,6 +496,7 @@ MAIS INFORMAÇÕES
 }
 
 func init() {
+	rootCmd.PersistentFlags().BoolVar(&ignoreHostKey, "ignore-host-key", false, "Ignora chave SSH divergente nesta execução, mantendo known_hosts")
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(manCmd)
 	rootCmd.AddCommand(cpCmd)
@@ -634,7 +645,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Uso: sc -c \"comando\" -l <host1> <host2> ... | arquivo.txt\n")
 			os.Exit(1)
 		}
-		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, envPassword, verbose)
+		cmd.ConnectMultiple(cfg, configPath, args, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, envPassword, verbose, cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey})
 		showUpdateNotification(updateResultChan, version)
 		return
 	}
@@ -642,7 +653,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	// Verifica se há argumentos (modo direto)
 	if len(args) > 0 {
 		hostArg := args[0]
-		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, envPassword, verbose)
+		cmd.Connect(cfg, configPath, hostArg, selectedUser, selectedJumpHost, command, proxyEnabled, askPassword, envPassword, verbose, cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey})
 		showUpdateNotification(updateResultChan, version)
 		return
 	}
@@ -655,7 +666,7 @@ func runCommand(cobraCmd *cobra.Command, args []string) {
 	}
 
 	// Modo interativo (menu)
-	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version, proxyEnabled, verbose)
+	cmd.ShowInteractive(cfg, selectedUser, selectedJumpHost, version, proxyEnabled, verbose, cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey})
 	showUpdateNotification(updateResultChan, version)
 }
 
@@ -897,14 +908,16 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		"",
 		0,
 		verbose,
+		cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
 	)
 
 	// Cria transferência
 	ft := &cmd.FileTransfer{
-		LocalPath:  localPath,
-		RemotePath: remotePath,
-		Recursive:  cpRecursive,
-		Verbose:    verbose,
+		LocalPath:      localPath,
+		RemotePath:     remotePath,
+		Recursive:      cpRecursive,
+		Verbose:        verbose,
+		HostKeyOptions: cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
 	}
 
 	fmt.Println()
@@ -1002,10 +1015,11 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 
 	// Cria transferência
 	ft := &cmd.FileTransfer{
-		LocalPath:  localPath,
-		RemotePath: remotePath,
-		Recursive:  cpRecursive,
-		Verbose:    verbose,
+		LocalPath:      localPath,
+		RemotePath:     remotePath,
+		Recursive:      cpRecursive,
+		Verbose:        verbose,
+		HostKeyOptions: cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
 	}
 
 	// Modo múltiplos hosts
@@ -1095,6 +1109,7 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		"",
 		0,
 		verbose,
+		cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
 	)
 
 	fmt.Println()
@@ -1239,6 +1254,7 @@ func runPortForward(cobraCmd *cobra.Command, args []string) {
 		"",
 		0,
 		verbose,
+		cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
 	)
 
 	// Cria sessão de port forward
@@ -1357,6 +1373,7 @@ func runTunnel(cobraCmd *cobra.Command, args []string) {
 		"",
 		0,
 		verbose,
+		cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
 	)
 	session := cmd.NewTunnelSession(sshConn, selectedJumpHost.Name, localPort)
 	stateDir := tunnelStateDirOrExit()

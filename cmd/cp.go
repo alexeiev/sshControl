@@ -25,10 +25,11 @@ type TransferResult struct {
 
 // FileTransfer gerencia transferências de arquivos via SFTP
 type FileTransfer struct {
-	LocalPath  string
-	RemotePath string
-	Recursive  bool
-	Verbose    bool
+	LocalPath      string
+	RemotePath     string
+	Recursive      bool
+	Verbose        bool
+	HostKeyOptions HostKeyOptions
 }
 
 // ProgressWriter implementa io.Writer para exibir progresso
@@ -571,6 +572,7 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 		"",
 		0,
 		ft.Verbose,
+		ft.HostKeyOptions,
 	)
 	sshConn.InteractivePasswordAllowed = false
 

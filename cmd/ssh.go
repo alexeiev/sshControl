@@ -33,6 +33,7 @@ type SSHConnection struct {
 	ProxyPort                  int
 	InteractivePasswordAllowed bool // Se false, não pede senha interativamente (para modo múltiplos hosts)
 	Verbose                    bool // Modo debug: exibe informações detalhadas da conexão
+	HostKeyOptions             HostKeyOptions
 }
 
 // debugLog imprime mensagens de debug quando o modo verbose está ativo
@@ -244,11 +245,15 @@ func (s *SSHConnection) createAuthMethods(sshKeyPaths []string, context string) 
 // createSSHConfigWithContext cria a configuração do cliente SSH com contexto para prompts
 func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientConfig, error) {
 	authMethods := s.createAuthMethods(s.SSHKeys, context)
+	hostKeyCallback, err := s.hostKeyCallback()
+	if err != nil {
+		return nil, err
+	}
 
 	config := &ssh.ClientConfig{
 		User:            s.User,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // Para produção, use ssh.FixedHostKey
+		HostKeyCallback: hostKeyCallback,
 	}
 
 	return config, nil
@@ -274,11 +279,16 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 	s.debugLog("Preparando autenticação do Jump Host: %s (%s@%s:%d)", s.JumpHost.Name, s.JumpHost.User, s.JumpHost.Host, s.JumpHost.Port)
 	jumpAuthMethods := s.createAuthMethods(s.JumpHostSSHKeys, fmt.Sprintf("%s@%s (Jump Host)", s.JumpHost.User, s.JumpHost.Host))
 
+	hostKeyCallback, err := s.hostKeyCallback()
+	if err != nil {
+		return nil, err
+	}
+
 	// Cria configuração separada para Jump Host
 	jumpConfig := &ssh.ClientConfig{
 		User:            s.JumpHost.User,
 		Auth:            jumpAuthMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 	}
 
 	// Conecta ao Jump Host
@@ -629,8 +639,8 @@ func (s *SSHConnection) installPublicKeyIfNeeded(client *ssh.Client) error {
 }
 
 // NewSSHConnection cria uma nova conexão SSH
-func NewSSHConnection(user, host string, port int, sshKeys []string, password string, jumpHost *config.JumpHost, jumpHostSSHKeys []string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, verbose bool) *SSHConnection {
-	return &SSHConnection{
+func NewSSHConnection(user, host string, port int, sshKeys []string, password string, jumpHost *config.JumpHost, jumpHostSSHKeys []string, command string, proxyEnabled bool, proxyAddress string, proxyPort int, verbose bool, hostKeys ...HostKeyOptions) *SSHConnection {
+	connection := &SSHConnection{
 		User:                       user,
 		Host:                       host,
 		Port:                       port,
@@ -645,4 +655,8 @@ func NewSSHConnection(user, host string, port int, sshKeys []string, password st
 		InteractivePasswordAllowed: true, // Por padrão, permite senha interativa (modo single host)
 		Verbose:                    verbose,
 	}
+	if len(hostKeys) > 0 {
+		connection.HostKeyOptions = hostKeys[0]
+	}
+	return connection
 }
