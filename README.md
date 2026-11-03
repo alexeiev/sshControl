@@ -335,12 +335,12 @@ O sshControl valida a identidade dos servidores e dos jump hosts usando `~/.ssh/
 - Servidor desconhecido: aceita e salva a chave automaticamente, exibindo seu fingerprint. Funciona também sem terminal, em execução ou upload em lote e em túneis em background.
 - Chave diferente da cadastrada: recusa a conexão por padrão.
 
-Após verificar a identidade do servidor, use a flag global `--ignore-host-key` para permitir uma chave divergente somente naquela execução:
+Após verificar a identidade do servidor, use a flag global `-i, --ignore-host-key` para permitir uma chave divergente somente naquela execução:
 
 ```bash
-sc --ignore-host-key webserver
+sc -i webserver
 sc --ignore-host-key -c "uptime" -l @web
-sc cp down --ignore-host-key webserver /var/log/app.log ./
+sc cp down -i webserver /var/log/app.log ./
 sc port-forward --ignore-host-key db-server 3307:3306
 sc tunnel --ignore-host-key -j 1
 ```

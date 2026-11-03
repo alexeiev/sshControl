@@ -451,7 +451,7 @@ FLAGS DISPONÍVEIS
   -p, --proxy               Habilita proxy reverso
   -a, --ask-password        Solicita senha antes de conectar
   -P, --env-password        Usa a senha da variável de ambiente SCPW
-      --ignore-host-key     Ignora chave SSH divergente somente nesta execução
+  -i, --ignore-host-key     Ignora chave SSH divergente somente nesta execução
   -v, --verbose             Modo debug (informações detalhadas da conexão)
   -V, --version             Exibe versão
   -h, --help                Exibe ajuda
@@ -463,7 +463,7 @@ AUTENTICAÇÃO
   Servidor desconhecido: aceita e salva a chave automaticamente, inclusive
   sem terminal, em lotes e em tunnels em background.
   Chave diferente: recusa a conexão. Após verificar a identidade do servidor,
-  --ignore-host-key permite ignorar a divergência somente nesta execução,
+  -i, --ignore-host-key permite ignorar a divergência somente nesta execução,
   com aviso e sem alterar known_hosts. Outra opção é verificar a identidade
   e remover a entrada antiga do arquivo. Chaves revogadas continuam bloqueadas.
 
@@ -496,7 +496,7 @@ MAIS INFORMAÇÕES
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVar(&ignoreHostKey, "ignore-host-key", false, "Ignora chave SSH divergente nesta execução, mantendo known_hosts")
+	rootCmd.PersistentFlags().BoolVarP(&ignoreHostKey, "ignore-host-key", "i", false, "Ignora chave SSH divergente nesta execução, mantendo known_hosts")
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(manCmd)
 	rootCmd.AddCommand(cpCmd)
