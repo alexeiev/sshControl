@@ -9,7 +9,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
-- Validação de host keys com `~/.ssh/known_hosts`, confirmação interativa de servidores desconhecidos e flag global `--ignore-host-key` para permitir divergências explicitamente sem sobrescrever chaves
+- Validação de host keys com `~/.ssh/known_hosts`, cadastro automático de servidores desconhecidos e flag global `--ignore-host-key` para permitir divergências explicitamente sem sobrescrever chaves
 - Checks de qualidade na CI com `golangci-lint`: relatório completo como artefato e bloqueio de novas ocorrências em pushes e Pull Requests
 - Auditoria de vulnerabilidades alcançáveis com `govulncheck` na CI
 - Análise CodeQL de Go e GitHub Actions em pushes, Pull Requests e execuções semanais, com resultados no Code scanning do GitHub

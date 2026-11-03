@@ -3,14 +3,12 @@ package cmd
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"errors"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/alexeiev/sshControl/config"
@@ -53,14 +51,14 @@ func TestHostKeyVerification(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			check := newHostKeyCallback(filename, false, nil)
+			check := newHostKeyCallback(filename, false)
 			if err := check(hostname, remote, key); err != nil {
 				t.Fatalf("chave conhecida recusada: %v", err)
 			}
 			if err := check(hostname, remote, changed); err == nil || !strings.Contains(err.Error(), "--ignore-host-key") {
 				t.Fatalf("chave divergente deveria ser recusada com orientação: %v", err)
 			}
-			if err := newHostKeyCallback(filename, true, nil)(hostname, remote, changed); err != nil {
+			if err := newHostKeyCallback(filename, true)(hostname, remote, changed); err != nil {
 				t.Fatalf("exceção explícita recusada: %v", err)
 			}
 			data, err := os.ReadFile(filename)
@@ -71,42 +69,26 @@ func TestHostKeyVerification(t *testing.T) {
 	}
 }
 
-func TestUnknownHostKeyConfirmation(t *testing.T) {
+func TestUnknownHostKeyIsAcceptedAndSaved(t *testing.T) {
 	t.Parallel()
 	key := testHostKey(t)
 	hostname := "server.example:2222"
 	remote := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2222}
-	for _, mode := range []string{"aceitar", "recusar", "sem terminal", "erro"} {
-		t.Run(mode, func(t *testing.T) {
+	for _, ignoreMismatch := range []bool{false, true} {
+		t.Run(strconv.FormatBool(ignoreMismatch), func(t *testing.T) {
 			filename := filepath.Join(t.TempDir(), ".ssh", "known_hosts")
-			var confirm func(string, ssh.PublicKey) (bool, error)
-			if mode != "sem terminal" {
-				confirm = func(host string, presented ssh.PublicKey) (bool, error) {
-					if host != hostname || ssh.FingerprintSHA256(presented) != ssh.FingerprintSHA256(key) {
-						t.Fatal("confirmação recebeu host ou chave incorretos")
-					}
-					if mode == "erro" {
-						return false, errors.New("leitura interrompida")
-					}
-					return mode == "aceitar", nil
-				}
-			}
-			// A flag de divergência não deve aceitar um host desconhecido sozinha.
-			err := newHostKeyCallback(filename, true, confirm)(hostname, remote, key)
-			if mode != "aceitar" {
-				if err == nil {
-					t.Fatal("chave desconhecida aceita sem confirmação")
-				}
-				if _, err := os.Stat(filename); !os.IsNotExist(err) {
-					t.Fatalf("arquivo criado sem confirmação: %v", err)
-				}
-				return
-			}
-			if err != nil {
+			if err := newHostKeyCallback(filename, ignoreMismatch)(hostname, remote, key); err != nil {
 				t.Fatal(err)
 			}
-			if err := newHostKeyCallback(filename, false, nil)(hostname, remote, key); err != nil {
-				t.Fatalf("chave confirmada não persistiu: %v", err)
+			data, err := os.ReadFile(filename)
+			if err != nil || !strings.Contains(string(data), knownhosts.Line([]string{hostname}, key)) {
+				t.Fatalf("chave nova não persistiu: %v", err)
+			}
+			if err := newHostKeyCallback(filename, false)(hostname, remote, key); err != nil {
+				t.Fatalf("chave cadastrada recusada: %v", err)
+			}
+			if err := newHostKeyCallback(filename, false)(hostname, remote, testHostKey(t)); err == nil {
+				t.Fatal("chave diferente aceita após o cadastro automático")
 			}
 			info, err := os.Stat(filename)
 			if err != nil || info.Mode().Perm() != 0600 {
@@ -125,7 +107,7 @@ func TestHashedKnownHostKey(t *testing.T) {
 	if err := os.WriteFile(filename, []byte(knownhosts.Line([]string{hashed}, key)+"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := newHostKeyCallback(filename, false, nil)(hostname, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2222}, key); err != nil {
+	if err := newHostKeyCallback(filename, false)(hostname, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2222}, key); err != nil {
 		t.Fatalf("entrada OpenSSH com hash recusada: %v", err)
 	}
 }
@@ -157,13 +139,13 @@ func TestSavingNewHostPreservesExistingFileWithoutFinalNewline(t *testing.T) {
 	if err := os.WriteFile(filename, []byte(knownhosts.Line([]string{"old.example:22"}, key)), 0600); err != nil {
 		t.Fatal(err)
 	}
-	check := newHostKeyCallback(filename, false, func(string, ssh.PublicKey) (bool, error) { return true, nil })
+	check := newHostKeyCallback(filename, false)
 	remote := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 22}
 	if err := check("new.example:22", remote, key); err != nil {
 		t.Fatal(err)
 	}
 	for _, host := range []string{"old.example:22", "new.example:22"} {
-		if err := newHostKeyCallback(filename, false, nil)(host, remote, key); err != nil {
+		if err := newHostKeyCallback(filename, false)(host, remote, key); err != nil {
 			t.Fatalf("chave de %s não preservada: %v", host, err)
 		}
 	}
@@ -179,25 +161,18 @@ func TestRevokedAndInvalidHostKeysAreNeverIgnored(t *testing.T) {
 		if err := os.WriteFile(filename, []byte(data), 0600); err != nil {
 			t.Fatal(err)
 		}
-		check := newHostKeyCallback(filename, true, func(string, ssh.PublicKey) (bool, error) {
-			t.Fatal("chave revogada ou arquivo inválido não deve oferecer confirmação")
-			return true, nil
-		})
+		check := newHostKeyCallback(filename, true)
 		if err := check(hostname, remote, key); err == nil {
 			t.Fatal("revogação ou arquivo inválido foi ignorado")
 		}
 	}
 }
 
-func TestConcurrentUnknownHostIsConfirmedOnce(t *testing.T) {
+func TestConcurrentUnknownHostIsSavedOnce(t *testing.T) {
 	t.Parallel()
 	filename := filepath.Join(t.TempDir(), "known_hosts")
 	key := testHostKey(t)
-	var confirmations atomic.Int32
-	check := newHostKeyCallback(filename, false, func(string, ssh.PublicKey) (bool, error) {
-		confirmations.Add(1)
-		return true, nil
-	})
+	check := newHostKeyCallback(filename, false)
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
@@ -207,8 +182,12 @@ func TestConcurrentUnknownHostIsConfirmedOnce(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if confirmations.Load() != 1 {
-		t.Fatalf("confirmações = %d; esperado 1", confirmations.Load())
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count := strings.Count(string(data), knownhosts.Line([]string{"server.example:22"}, key)); count != 1 {
+		t.Fatalf("entradas cadastradas = %d; esperado 1", count)
 	}
 }
 
@@ -232,7 +211,7 @@ func TestHostKeyChecksDuringDirectAndJumpHandshakes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"direct", "jump", "target changed", "jump changed", "ignore changed"} {
+	for _, mode := range []string{"direct", "jump", "new hosts", "target changed", "jump changed", "ignore changed"} {
 		t.Run(mode, func(t *testing.T) {
 			keys := map[string]ssh.PublicKey{target: targetKey, jump: jumpKey}
 			if mode == "target changed" || mode == "ignore changed" {
@@ -242,6 +221,9 @@ func TestHostKeyChecksDuringDirectAndJumpHandshakes(t *testing.T) {
 				keys[jump] = testHostKey(t)
 			}
 			options := HostKeyOptions{KnownHostsFile: trustedTestHostKeys(t, keys), IgnoreMismatch: mode == "ignore changed"}
+			if mode == "new hosts" {
+				options.KnownHostsFile = filepath.Join(t.TempDir(), "known_hosts")
+			}
 			var via *config.JumpHost
 			if mode != "direct" {
 				via = &config.JumpHost{Name: "jump", Host: jumpHost, Port: jumpPort, User: "user"}
@@ -262,6 +244,17 @@ func TestHostKeyChecksDuringDirectAndJumpHandshakes(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatal(err)
+			}
+			if mode == "new hosts" {
+				data, err := os.ReadFile(options.KnownHostsFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for address, key := range keys {
+					if !strings.Contains(string(data), knownhosts.Line([]string{address}, key)) {
+						t.Fatalf("chave de %s não cadastrada automaticamente", address)
+					}
+				}
 			}
 			if err := client.Close(); err != nil {
 				t.Fatal(err)

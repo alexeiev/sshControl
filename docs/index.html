@@ -427,8 +427,8 @@ export {https,http,ftp}_proxy=http://127.0.0.1:9999</pre>
                 </div>
                 <div class="item">
                     <h4>Identidade dos servidores SSH</h4>
-                    <p>Valida servidores e jump hosts em <code>~/.ssh/known_hosts</code>. Chaves desconhecidas exigem confirmação no terminal; lotes e tunnels em background precisam de cadastro prévio. Para cadastrar a chave de um tunnel, conecte primeiro com <code>-v</code>.</p>
-                    <p>Após conferir o fingerprint, <code>--ignore-host-key</code> permite uma chave divergente somente naquela execução, com aviso e sem substituir o cadastro. Chaves desconhecidas e revogadas continuam protegidas.</p>
+                    <p>Valida servidores e jump hosts em <code>~/.ssh/known_hosts</code>. Aceita e cadastra automaticamente a chave de um servidor novo, inclusive em lotes e tunnels em background.</p>
+                    <p>Chaves divergentes bloqueiam a conexão. Após conferir o fingerprint, use <code>--ignore-host-key</code> para continuar somente naquela execução, com aviso e sem substituir o cadastro, ou remova a entrada antiga para cadastrar a nova chave na próxima conexão. Chaves revogadas continuam bloqueadas.</p>
                 </div>
             </div>
         </div>

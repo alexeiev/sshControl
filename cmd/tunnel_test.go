@@ -219,12 +219,12 @@ func TestTunnelSessionEndToEnd(t *testing.T) {
 		}
 	}()
 
-	sshAddr, hostKey := startTestSSHServer(t, "tunnel", "secret")
+	sshAddr, _ := startTestSSHServer(t, "tunnel", "secret")
 	host, portStr, _ := net.SplitHostPort(sshAddr)
 	sshPort, _ := strconv.Atoi(portStr)
 
 	sshConn := NewSSHConnection("tunnel", host, sshPort, nil, "secret", nil, nil, "", false, "", 0, false)
-	sshConn.HostKeyOptions.KnownHostsFile = trustedTestHostKeys(t, map[string]ssh.PublicKey{sshAddr: hostKey})
+	sshConn.HostKeyOptions.KnownHostsFile = filepath.Join(t.TempDir(), "known_hosts")
 	sshConn.InteractivePasswordAllowed = false
 	session := NewTunnelSession(sshConn, "test-jump", freePort(t))
 

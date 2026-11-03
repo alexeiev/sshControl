@@ -460,12 +460,12 @@ FLAGS DISPONÍVEIS
 
 AUTENTICAÇÃO
   As chaves dos servidores e jump hosts são validadas em ~/.ssh/known_hosts.
-  Servidor desconhecido: pede confirmação no terminal antes de salvar a chave.
-  Sem terminal, em lotes e em tunnels em background, exige cadastro prévio.
-  Para cadastrar a chave de um tunnel, conecte primeiro com sc tunnel -j 1 -v.
+  Servidor desconhecido: aceita e salva a chave automaticamente, inclusive
+  sem terminal, em lotes e em tunnels em background.
   Chave diferente: recusa a conexão. Após verificar a identidade do servidor,
   --ignore-host-key permite ignorar a divergência somente nesta execução,
-  com aviso e sem alterar known_hosts. Chaves revogadas continuam bloqueadas.
+  com aviso e sem alterar known_hosts. Outra opção é verificar a identidade
+  e remover a entrada antiga do arquivo. Chaves revogadas continuam bloqueadas.
 
   Ordem de tentativa:
   1. Chave SSH (configurada no config.yaml)
