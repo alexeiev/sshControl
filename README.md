@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/github/license/alexeiev/sshControl?color=green)](https://github.com/alexeiev/sshControl/blob/main/LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/alexeiev/sshControl)](https://go.dev/)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/alexeiev/sshControl/release.yml?branch%3Amain)](https://github.com/alexeiev/sshControl/actions)
+[![CodeQL](https://github.com/alexeiev/sshControl/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/alexeiev/sshControl/actions/workflows/codeql.yml)
 [![Downloads](https://img.shields.io/github/downloads/alexeiev/sshControl/total?color=orange)](https://github.com/alexeiev/sshControl/releases)
 
 Gerenciador de conexões SSH escrito em Go com interface interativa (TUI) e modo CLI direto.
@@ -1028,10 +1029,14 @@ VERSION=v1.1.0 make build
 
 ### Qualidade e segurança na CI
 
-A CI executa três checks em pushes para `main` e em Pull Requests: testes Go, `golangci-lint` e `govulncheck`. As ferramentas são gratuitas e não precisam de conta ou token externo.
+O workflow `CI` executa três checks em pushes para `main` e em Pull Requests: testes Go, `golangci-lint` e `govulncheck`. As ferramentas são gratuitas e não precisam de conta ou token externo.
 
 - **golangci-lint v2.15.0**: usa as regras de `.golangci.yml` (`errcheck`, `govet`, `ineffassign`, `staticcheck` e `unused`). Cada execução disponibiliza o relatório JSON completo no artefato `golangci-lint-report`. Os apontamentos existentes continuam visíveis; novas ocorrências nas linhas alteradas fazem o check falhar, comparando com a base do PR ou com o commit anterior ao push.
 - **govulncheck v1.9.0**: consulta a base de vulnerabilidades do Go e falha quando encontra vulnerabilidades conhecidas alcançáveis pelo código. Também informa problemas em dependências que não parecem ser chamados pelo projeto.
+
+O workflow **CodeQL** complementa esses checks com análise de segurança do código Go e dos workflows do GitHub Actions, usando as regras padrão. Ele executa nos PRs para `main`, em pushes para `main`, semanalmente e sob demanda pela aba Actions. Os resultados ficam em **Security → Code scanning**, separados por linguagem.
+
+O badge CodeQL mostra o status da execução na `main`; uma execução bem-sucedida ainda pode gerar alertas que precisam ser analisados e tratados.
 
 Para executar localmente, use Go 1.26 com o patch mais recente e instale `golangci-lint` v2.15.0 pelos [binários oficiais](https://golangci-lint.run/docs/welcome/install/local/):
 
