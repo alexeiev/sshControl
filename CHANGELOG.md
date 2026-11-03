@@ -7,9 +7,18 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-03
+
 ### Added
 
-- Validação de host keys com `~/.ssh/known_hosts`, cadastro automático de servidores desconhecidos e flag global `-i, --ignore-host-key` para permitir divergências explicitamente sem sobrescrever chaves
+- **Validação de host keys SSH** usando `~/.ssh/known_hosts`, compartilhado com o SSH convencional e independente de `SCCONFIG`
+  - Chaves de servidores desconhecidos são aceitas e salvas automaticamente, inclusive em lotes e tunnels em background
+  - Chaves conhecidas e iguais permitem a conexão; chaves diferentes bloqueiam a conexão com um alerta
+  - Nova flag global **`-i, --ignore-host-key`** permite uma chave divergente somente naquela execução, com aviso e sem sobrescrever a entrada existente
+  - Após verificar a identidade do servidor, o usuário também pode remover a entrada antiga do `known_hosts` para cadastrar a nova chave na próxima conexão
+  - Disponível em conexões diretas, TUI, comandos em lote, SFTP, port forwarding e tunnels, validando tanto o destino quanto o jump host
+  - Compatível com entradas OpenSSH com hash, portas alternativas e endereços IPv6 na verificação de chaves
+- Testes de regressão para validação e cadastro de chaves, divergências, revogação, concorrência, handshakes diretos e via jump host e herança das flags curta e longa
 - Checks de qualidade na CI com `golangci-lint`: relatório completo como artefato e bloqueio de novas ocorrências em pushes e Pull Requests
 - Auditoria de vulnerabilidades alcançáveis com `govulncheck` na CI
 - Análise CodeQL de Go e GitHub Actions em pushes, Pull Requests e execuções semanais, com resultados no Code scanning do GitHub
@@ -18,6 +27,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ### Changed
 
 - Versão mínima do Go atualizada para 1.26; CI e release usam o patch mais recente da série 1.26
+- Actions atualizadas para Node.js 24 e runners Linux fixados em `ubuntu-24.04`
+- Publicação do site migrada para um workflow próprio do GitHub Pages, com preparação do artefato nos PRs e deploy dos arquivos de `docs` após o merge na `main`
+- README, manual e site atualizados com a política de host keys e o uso de `-i, --ignore-host-key`
 
 ### Security
 
@@ -343,7 +355,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/alexeiev/sshControl/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/alexeiev/sshControl/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/alexeiev/sshControl/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/alexeiev/sshControl/compare/v0.8.0...v0.9.0
