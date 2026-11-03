@@ -26,8 +26,10 @@ curl -fsSL https://sshcontrol.alexeiev.me/install | bash
 Para atualizar o conteúdo:
 
 1. Edite os arquivos neste diretório
-2. Commit e push para a branch `main`
-3. GitHub Pages atualiza automaticamente em 1-2 minutos
+2. Abra um Pull Request para `main`; o workflow `GitHub Pages` prepara o artefato do site para validação, sem publicar
+3. Após o merge, o mesmo workflow publica o conteúdo de `docs` automaticamente
+
+O workflow está em [`.github/workflows/pages.yml`](../.github/workflows/pages.yml). Ele publica os arquivos estáticos diretamente, sem Jekyll, usando `ubuntu-24.04` e actions com Node.js 24. Também pode ser executado manualmente pela aba Actions; a publicação só ocorre na branch `main`.
 
 ### Atualizar Página Web
 
@@ -61,6 +63,10 @@ git push origin main
 
 Veja [`docs_int/GITHUB_PAGES_SETUP.md`](../docs_int/GITHUB_PAGES_SETUP.md) para instruções completas de como configurar o GitHub Pages e o DNS customizado.
 
+Em **Settings → Pages → Build and deployment → Source**, selecione **GitHub Actions**. O domínio personalizado deve continuar configurado como `sshcontrol.alexeiev.me` nas configurações do Pages; o arquivo `CNAME` permanece no diretório `docs` como referência.
+
+Para voltar à publicação automática anterior, altere a fonte para **Deploy from a branch**, com branch `main` e pasta `/docs`, e desative o workflow `GitHub Pages` na aba Actions.
+
 ## Identidade Visual
 
 As cores e fontes ficam como variáveis no `:root` de `style.css`:
@@ -75,9 +81,9 @@ As saídas mostradas nos terminais da página seguem o formato real impresso pel
 
 ## Manutenção
 
-- O GitHub Pages é servido da pasta `/docs` na branch `main`
+- O workflow `GitHub Pages` publica os arquivos de `/docs` da branch `main`
 - HTTPS é gerenciado automaticamente pelo GitHub via Let's Encrypt
-- O domínio customizado é configurado via arquivo `CNAME`
+- O domínio customizado é mantido nas configurações do Pages; o arquivo `CNAME` documenta o domínio usado
 - Cache do navegador é configurado automaticamente pelo GitHub
 
 ## Verificação
