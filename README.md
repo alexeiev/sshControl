@@ -327,6 +327,26 @@ sc cp up -l @web ./deploy.sh /opt/
 - `-P, --env-password`: Usa a senha da variável de ambiente `SCPW`
 - `-v, --verbose`: Modo debug (informações detalhadas da conexão)
 
+### Verificação das chaves dos servidores SSH
+
+O sshControl valida a identidade dos servidores e dos jump hosts usando `~/.ssh/known_hosts`, no formato OpenSSH. Esse arquivo é compartilhado com o SSH convencional e permanece no mesmo caminho quando `SCCONFIG` aponta para outro YAML.
+
+- Chave conhecida: conecta normalmente.
+- Servidor desconhecido: aceita e salva a chave automaticamente, exibindo seu fingerprint. Funciona também sem terminal, em execução ou upload em lote e em túneis em background.
+- Chave diferente da cadastrada: recusa a conexão por padrão.
+
+Após verificar a identidade do servidor, use a flag global `-i, --ignore-host-key` para permitir uma chave divergente somente naquela execução:
+
+```bash
+sc -i webserver
+sc --ignore-host-key -c "uptime" -l @web
+sc cp down -i webserver /var/log/app.log ./
+sc port-forward --ignore-host-key db-server 3307:3306
+sc tunnel --ignore-host-key -j 1
+```
+
+A flag vale para o destino e para o jump host. A divergência continua sendo exibida como aviso, e a chave registrada não é substituída. Ela não ignora chaves revogadas ou certificados inválidos. Para uma troca permanente, confira o fingerprint por um canal confiável e remova a entrada antiga do `known_hosts`; a próxima conexão cadastrará a nova chave automaticamente.
+
 ### Modo Debug (Verbose)
 
 Use a flag `-v` para exibir informações detalhadas da conexão, útil para diagnosticar problemas de autenticação, rede ou configuração:

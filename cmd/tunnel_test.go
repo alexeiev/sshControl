@@ -219,11 +219,12 @@ func TestTunnelSessionEndToEnd(t *testing.T) {
 		}
 	}()
 
-	sshAddr := startTestSSHServer(t, "tunnel", "secret")
+	sshAddr, _ := startTestSSHServer(t, "tunnel", "secret")
 	host, portStr, _ := net.SplitHostPort(sshAddr)
 	sshPort, _ := strconv.Atoi(portStr)
 
 	sshConn := NewSSHConnection("tunnel", host, sshPort, nil, "secret", nil, nil, "", false, "", 0, false)
+	sshConn.HostKeyOptions.KnownHostsFile = filepath.Join(t.TempDir(), "known_hosts")
 	sshConn.InteractivePasswordAllowed = false
 	session := NewTunnelSession(sshConn, "test-jump", freePort(t))
 
@@ -279,7 +280,7 @@ func freePort(t *testing.T) int {
 }
 
 // startTestSSHServer inicia um servidor SSH mínimo com suporte a direct-tcpip
-func startTestSSHServer(t *testing.T, user, password string) string {
+func startTestSSHServer(t *testing.T, user, password string) (string, ssh.PublicKey) {
 	t.Helper()
 
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
@@ -317,7 +318,7 @@ func startTestSSHServer(t *testing.T, user, password string) string {
 		}
 	}()
 
-	return ln.Addr().String()
+	return ln.Addr().String(), signer.PublicKey()
 }
 
 func serveTestSSHConn(nConn net.Conn, cfg *ssh.ServerConfig) {

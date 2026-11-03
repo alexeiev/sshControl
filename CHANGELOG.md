@@ -9,6 +9,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
+- Validação de host keys com `~/.ssh/known_hosts`, cadastro automático de servidores desconhecidos e flag global `-i, --ignore-host-key` para permitir divergências explicitamente sem sobrescrever chaves
 - Checks de qualidade na CI com `golangci-lint`: relatório completo como artefato e bloqueio de novas ocorrências em pushes e Pull Requests
 - Auditoria de vulnerabilidades alcançáveis com `govulncheck` na CI
 - Análise CodeQL de Go e GitHub Actions em pushes, Pull Requests e execuções semanais, com resultados no Code scanning do GitHub
@@ -20,6 +21,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Security
 
+- Remove a aceitação incondicional de host keys em conexões diretas e via jump host; chaves revogadas e arquivos inválidos permanecem bloqueados mesmo com a flag de exceção
+- Define `contents: read` no workflow de teste do instalador para limitar as permissões do `GITHUB_TOKEN`
 - Atualiza `golang.org/x/crypto` de v0.46.0 para v0.56.0 e suas dependências para corrigir sete vulnerabilidades alcançáveis em SSH identificadas pelo `govulncheck`
 
 ## [1.1.0] - 2026-11-03
