@@ -64,14 +64,13 @@ hosts:
 
 // InitializeConfigDir inicializa o diretório de configuração e retorna o caminho completo
 func InitializeConfigDir() (string, error) {
-	// Obtém o diretório home do usuário
-	homeDir, err := os.UserHomeDir()
+	configFile, err := GetConfigPath()
 	if err != nil {
-		return "", fmt.Errorf("erro ao obter diretório home: %w", err)
+		return "", err
 	}
 
 	// Caminho completo do diretório de configuração
-	configDir := filepath.Join(homeDir, ConfigDirName)
+	configDir := filepath.Dir(configFile)
 
 	// Verifica se o diretório existe
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
@@ -80,10 +79,9 @@ func InitializeConfigDir() (string, error) {
 			return "", fmt.Errorf("erro ao criar diretório %s: %w", configDir, err)
 		}
 		fmt.Printf("✓ Diretório criado: %s\n", configDir)
+	} else if err != nil {
+		return "", fmt.Errorf("erro ao acessar diretório %s: %w", configDir, err)
 	}
-
-	// Caminho completo do arquivo de configuração
-	configFile := filepath.Join(configDir, ConfigFileName)
 
 	// Verifica se o arquivo de configuração existe
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
@@ -94,6 +92,8 @@ func InitializeConfigDir() (string, error) {
 		fmt.Printf("✓ Arquivo de configuração criado: %s\n", configFile)
 		fmt.Println("✓ Configuração de exemplo criada. Edite o arquivo para adicionar seus hosts.")
 		fmt.Println()
+	} else if err != nil {
+		return "", fmt.Errorf("erro ao acessar arquivo de configuração %s: %w", configFile, err)
 	} else {
 		// Config já existe - verifica se há novas opções a serem adicionadas
 		if err := MigrateConfig(configFile); err != nil {
@@ -104,8 +104,11 @@ func InitializeConfigDir() (string, error) {
 	return configFile, nil
 }
 
-// GetConfigPath retorna o caminho completo do arquivo de configuração
+// GetConfigPath prioriza SCCONFIG; se ausente ou vazia, usa o caminho padrão.
 func GetConfigPath() (string, error) {
+	if configPath := os.Getenv("SCCONFIG"); configPath != "" {
+		return ExpandHomePath(configPath), nil
+	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("erro ao obter diretório home: %w", err)

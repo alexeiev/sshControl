@@ -73,6 +73,25 @@ make build
 
 Na primeira execução, o sshControl cria automaticamente o arquivo de configuração em `~/.sshControl/config.yaml`.
 
+Para manter configurações separadas, defina `SCCONFIG` com o caminho do arquivo desejado:
+
+```bash
+export SCCONFIG=/diretorio-local/config.yaml
+sc -s
+
+# Ou selecione um arquivo apenas para uma execução:
+SCCONFIG=/diretorio-local/producao.yaml sc -s
+
+# Volte ao arquivo padrão:
+unset SCCONFIG
+```
+
+Quando `SCCONFIG` está definida e não está vazia, o arquivo indicado tem prioridade em todos os comandos. Se a variável estiver ausente ou vazia, o caminho padrão é usado. Caminhos relativos e caminhos iniciados por `~/` também são aceitos.
+
+Se o arquivo escolhido não existir, seus diretórios e um template serão criados automaticamente. A migração de configuração e o salvamento de hosts com `auto_create` também usam esse arquivo. Erros ao acessar o caminho informado são exibidos sem recorrer ao arquivo padrão.
+
+Os logs e o estado dos tunnels continuam em `~/.sshControl/tunnels`, independentemente de `SCCONFIG`.
+
 ### Exemplo de Configuração
 
 ```yaml
@@ -1004,7 +1023,7 @@ make build
 go run .
 
 # Build com versão customizada
-VERSION=v1.0.0 make build
+VERSION=v1.1.0 make build
 ```
 
 ### Criar uma Release
@@ -1012,12 +1031,12 @@ VERSION=v1.0.0 make build
 ```bash
 # 1. Commite todas as mudanças
 git add .
-git commit -m "Release v1.0.0"
+git commit -m "chore: Release v1.1.0"
 
 # 2. Crie e envie a tag
-git tag -a v1.0.0 -m "Release v1.0.0"
+git tag -a v1.1.0 -m "Release v1.1.0"
 git push origin main
-git push origin v1.0.0
+git push origin v1.1.0
 ```
 
 O GitHub Actions automaticamente:

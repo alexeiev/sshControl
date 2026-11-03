@@ -20,7 +20,7 @@
 <body>
     <header class="topbar">
       <div class="wrap topbar-inner">
-        <a class="wordmark" href="/"><span><span class="prompt">&gt;_</span> sshControl</span><span class="ver">v1.0.0</span></a>
+        <a class="wordmark" href="/"><span><span class="prompt">&gt;_</span> sshControl</span><span class="ver">v1.1.0</span></a>
         <nav class="topnav" aria-label="Seções">
             <a href="#conectar">Conectar</a>
             <a href="#comandos">Comandos Remotos</a>
@@ -38,8 +38,8 @@
     <!-- ============================== HERO ============================== -->
     <section class="hero">
         <div>
-            <a class="release-note" href="https://github.com/alexeiev/sshControl/releases/tag/v1.0.0">
-                <span class="tag">v1.0.0</span> sc tunnel com SOCKS5 e filtro por várias tags
+            <a class="release-note" href="https://github.com/alexeiev/sshControl/releases/tag/v1.1.0">
+                <span class="tag">v1.1.0</span> Um config para cada ambiente com SCCONFIG
             </a>
             <h1>Seus servidores, a um <span class="sc">sc</span> de distância.</h1>
             <p class="lede">
@@ -119,7 +119,7 @@ Erro: erro ao conectar: i/o timeout
                 </div>
                 <div class="term tui">
                     <div class="term-bar"><i></i><i></i><i></i><span>sc -j 1</span></div>
-<div class="tui-banner"><span class="t-brand t-b">🚀 SSH Control</span> <span class="t-dim">v1.0.0</span>  <span class="t-dim">|</span>  SSH User: <span class="t-ok t-b">ubuntu</span>  <span class="t-dim">|</span>  Jump Host: <span class="t-ok t-b">production-jump</span>  <span class="t-dim">|</span>  Proxy: <span class="t-fail">FALSE</span></div>
+<div class="tui-banner"><span class="t-brand t-b">🚀 SSH Control</span> <span class="t-dim">v1.1.0</span>  <span class="t-dim">|</span>  SSH User: <span class="t-ok t-b">ubuntu</span>  <span class="t-dim">|</span>  Jump Host: <span class="t-ok t-b">production-jump</span>  <span class="t-dim">|</span>  Proxy: <span class="t-fail">FALSE</span></div>
 <pre><span class="t-sig">Filtro:</span> @web @production<span class="cursor" aria-hidden="true"></span>
 
   <span class="sel">│ web1</span>
@@ -431,13 +431,13 @@ export {https,http,ftp}_proxy=http://127.0.0.1:9999</pre>
 
     <!-- ========================== CONFIGURAÇÃO ========================== -->
     <section class="man" id="config">
-        <div class="man-head"><h2>Configuração<small>~/.sshControl/config.yaml</small></h2></div>
+        <div class="man-head"><h2>Configuração<small>Padrão: ~/.sshControl/config.yaml</small></h2></div>
         <div class="man-body">
             <div class="pair">
                 <div class="intro">
                     <h3>Um arquivo YAML que se atualiza sozinho.</h3>
                     <p>
-                        Na primeira execução, o <code>sc</code> cria um template comentado. A cada nova versão,
+                        Se o arquivo escolhido não existir, o <code>sc</code> cria seus diretórios e um template comentado. A cada nova versão,
                         as chaves que faltam no seu config são adicionadas com os valores padrão e comentários,
                         sem mexer no que já existe.
                     </p>
@@ -471,6 +471,33 @@ export {https,http,ftp}_proxy=http://127.0.0.1:9999</pre>
     <span class="k">port:</span> <span class="n">22</span>
     <span class="k">tags:</span> [<span class="s">web</span>, <span class="s">production</span>]</pre>
             </div>
+            <div class="pair">
+                <div class="intro">
+                    <h3>Um config para cada ambiente.</h3>
+                    <p>
+                        Defina <code>SCCONFIG</code> para escolher outro arquivo YAML em todos os comandos.
+                        Se a variável estiver ausente ou vazia, o <code>sc</code> usa <code>~/.sshControl/config.yaml</code>.
+                        Caminhos relativos e iniciados por <code>~/</code> também são aceitos.
+                    </p>
+                    <p>
+                        A migração e o salvamento de hosts com <code>auto_create</code> usam o arquivo escolhido.
+                        Erros ao acessar o caminho informado são exibidos sem recorrer ao config padrão.
+                    </p>
+                    <p>
+                        Os logs e o estado dos tunnels continuam em <code>~/.sshControl/tunnels</code>,
+                        independentemente de <code>SCCONFIG</code>.
+                    </p>
+                </div>
+<pre class="snip"><span class="c"># Use outro arquivo nas próximas execuções</span>
+<span class="p">$ </span>export SCCONFIG=/diretorio-local/config.yaml
+<span class="p">$ </span>sc -s
+
+<span class="c"># Escolha um arquivo só para este comando</span>
+<span class="p">$ </span>SCCONFIG=/diretorio-local/producao.yaml sc -s
+
+<span class="c"># Volte ao arquivo padrão</span>
+<span class="p">$ </span>unset SCCONFIG</pre>
+            </div>
         </div>
     </section>
 
@@ -495,6 +522,8 @@ export {https,http,ftp}_proxy=http://127.0.0.1:9999</pre>
                         <tr><td>-P, --env-password</td><td>Usa a senha da variável <code>SCPW</code></td></tr>
                         <tr><td>-v, --verbose</td><td>Modo debug (no <code>tunnel</code>, roda em foreground)</td></tr>
                         <tr><td>-V, --version</td><td>Versão, data do build e commit</td></tr>
+                        <tr class="ref-group"><td colspan="2">Variáveis de ambiente</td></tr>
+                        <tr><td>SCCONFIG <span>&lt;caminho&gt;</span></td><td>Arquivo YAML prioritário; ausente ou vazia, usa <code>~/.sshControl/config.yaml</code></td></tr>
                         <tr class="ref-group"><td colspan="2">Subcomandos</td></tr>
                         <tr><td>sc tunnel <span>-j &lt;jump&gt;</span></td><td>Proxy SOCKS5 local via jump host (<code>status</code>, <code>stop</code>)</td></tr>
                         <tr><td>sc port-forward <span>&lt;host&gt; L:R</span></td><td>Encaminha uma porta local para uma porta remota</td></tr>

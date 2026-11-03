@@ -5,6 +5,24 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.1.0] - 2026-11-03
+
+### Added
+
+- **Configuração por variável de ambiente (`SCCONFIG`)**: permite manter arquivos YAML separados e selecionar qual usar em todos os comandos
+  - Ex.: `export SCCONFIG=/diretorio-local/config.yaml` ou `SCCONFIG=/diretorio-local/producao.yaml sc -s`
+  - Quando a variável está ausente ou vazia, usa `~/.sshControl/config.yaml`
+  - Aceita caminhos absolutos, relativos e iniciados por `~/`
+  - Se o arquivo escolhido não existir, cria os diretórios e o template automaticamente
+  - A migração de configuração e o salvamento de hosts com `auto_create` usam o arquivo escolhido
+  - Erros no caminho informado são exibidos sem recorrer ao arquivo padrão
+- Testes de regressão para seleção, criação, migração e persistência da configuração, além da localização do estado dos tunnels
+- Documentação de `SCCONFIG` no README, no manual (`sc man`) e no site
+
+### Changed
+
+- O diretório de logs e estado dos tunnels permanece fixo em `~/.sshControl/tunnels`, independentemente do arquivo selecionado por `SCCONFIG`
+
 ## [1.0.0] - 2026-09-22
 
 ### Added
@@ -305,7 +323,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/alexeiev/sshControl/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/alexeiev/sshControl/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/alexeiev/sshControl/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/alexeiev/sshControl/compare/v0.7.0...v0.8.0
