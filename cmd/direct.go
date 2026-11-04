@@ -122,7 +122,9 @@ func Connect(cfg *config.ConfigFile, configPath string, hostArg string, selected
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "\n❌ Erro na conexão SSH: %v\n", err)
+		if command == "" {
+			fmt.Fprintf(os.Stderr, "\n❌ Erro na conexão SSH: %v\n", err)
+		}
 		os.Exit(1)
 	}
 
@@ -168,72 +170,56 @@ type parsedHost struct {
 	port       int
 }
 
-// parseDirectConnection analisa uma string de conexão direta
+// parseDirectConnection aplica os defaults ao destino após o parsing.
 func parseDirectConnection(input string, effectiveUser *config.User) (*parsedHost, error) {
-	// Regex para parsear: [user@]host[:port]
-	re := regexp.MustCompile(`^(?:([^@]+)@)?([^:]+)(?::(\d+))?$`)
-	matches := re.FindStringSubmatch(input)
-
-	if matches == nil {
-		return nil, fmt.Errorf("formato inválido: '%s'", input)
+	parsedUser, hostname, port, err := ParseConnectionString(input)
+	if err != nil {
+		return nil, err
 	}
 
-	parsedUser := matches[1]
-	hostname := matches[2]
-	portStr := matches[3]
-
-	// Prioridade do usuário:
-	// 1. Usuário especificado na string (user@host)
-	// 2. Usuário efetivo (da flag -u ou default_user)
-	// 3. Usuário do sistema como fallback
+	// Usuário explícito > usuário efetivo (-u/default_user) > usuário local.
 	if parsedUser == "" {
 		if effectiveUser != nil {
 			parsedUser = effectiveUser.Name
 		} else {
 			currentUser, err := user.Current()
 			if err != nil {
-				parsedUser = "root" // fallback
+				parsedUser = "root"
 			} else {
 				parsedUser = currentUser.Username
 			}
 		}
 	}
-
-	// Se não especificou porta, usa 22
-	port := 22
-	if portStr != "" {
-		var err error
-		port, err = strconv.Atoi(portStr)
-		if err != nil || port < 1 || port > 65535 {
-			return nil, fmt.Errorf("porta inválida: '%s'", portStr)
-		}
-	}
-
-	// Valida o hostname
-	if hostname == "" {
-		return nil, fmt.Errorf("hostname não pode ser vazio")
-	}
-
-	return &parsedHost{
-		parsedUser: parsedUser,
-		hostname:   hostname,
-		port:       port,
-	}, nil
+	return &parsedHost{parsedUser: parsedUser, hostname: hostname, port: port}, nil
 }
 
-// ValidateHostFormat valida se o formato da string é válido
+// ValidateHostFormat valida se o formato da string é válido.
 func ValidateHostFormat(input string) bool {
-	_, err := parseDirectConnection(input, nil)
+	_, _, _, err := ParseConnectionString(input)
 	return err == nil
 }
 
-// ParseConnectionString é uma função auxiliar pública para testes
-func ParseConnectionString(input string) (user, host string, port int, err error) {
-	h, e := parseDirectConnection(input, nil)
-	if e != nil {
-		return "", "", 0, e
+// ParseConnectionString extrai [user@]host[:port] sem escolher um usuário.
+// Quando não há user@, retorna usuário vazio para preservar -u e os defaults
+// já resolvidos pelo chamador (cp up, cp down e port-forward).
+func ParseConnectionString(input string) (username, host string, port int, err error) {
+	re := regexp.MustCompile(`^(?:([^@]+)@)?([^:]+)(?::(\d+))?$`)
+	matches := re.FindStringSubmatch(input)
+	if matches == nil {
+		return "", "", 0, fmt.Errorf("formato inválido: '%s'", input)
 	}
-	return h.parsedUser, h.hostname, h.port, nil
+	username, host, portText := matches[1], matches[2], matches[3]
+	port = 22
+	if portText != "" {
+		port, err = strconv.Atoi(portText)
+		if err != nil || port < 1 || port > 65535 {
+			return "", "", 0, fmt.Errorf("porta inválida: '%s'", portText)
+		}
+	}
+	if host == "" {
+		return "", "", 0, fmt.Errorf("hostname não pode ser vazio")
+	}
+	return username, host, port, nil
 }
 
 // printUsers exibe os usuários cadastrados com seus índices (1-based)

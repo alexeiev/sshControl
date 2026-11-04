@@ -14,6 +14,7 @@ import (
 
 // HostResult armazena o resultado da execução em um host
 type HostResult struct {
+	User             string
 	Host             string
 	Success          bool
 	Output           string
@@ -56,15 +57,10 @@ func ConnectMultiple(cfg *config.ConfigFile, configPath string, hostArgs []strin
 		fmt.Fprintf(os.Stderr, "⚠️  Aviso: Proxy solicitado mas não configurado no config.yaml\n\n")
 	}
 
-	fmt.Println()
 	if len(tagsFound) > 0 {
 		fmt.Printf("🏷️  Tags: %s\n", strings.Join(tagsFound, ", "))
 	}
-	fmt.Printf("🚀 Executando comando em %d host(s): %s\n", len(hostArgs), command)
-	if jumpHost != nil {
-		fmt.Printf("   via Jump Host: %s (%s@%s:%d)\n", jumpHost.Name, jumpHost.User, jumpHost.Host, jumpHost.Port)
-	}
-	fmt.Println()
+	PrintOperationHeader(fmt.Sprintf("Executando comando em %d host(s): %s", len(hostArgs), command), jumpHost)
 
 	// Em modo múltiplos hosts, resolve a senha uma única vez.
 	// -P lê da variável de ambiente SCPW; -a solicita interativamente.
@@ -156,6 +152,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		host, err := parseDirectConnection(hostArg, effectiveUser)
 		if err != nil {
 			return HostResult{
+				User:    username,
 				Host:    hostArg,
 				Success: false,
 				Error:   fmt.Sprintf("Formato inválido: %v", err),
@@ -227,6 +224,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 		}
 
 		return HostResult{
+			User:     username,
 			Host:     hostArg,
 			Success:  false,
 			Output:   output,
@@ -236,6 +234,7 @@ func executeOnHost(cfg *config.ConfigFile, hostArg string, effectiveUser *config
 	}
 
 	return HostResult{
+		User:             username,
 		Host:             hostArg,
 		Success:          true,
 		Output:           output,
@@ -291,48 +290,9 @@ func autoCreateHostsFromResults(cfg *config.ConfigFile, configPath string, resul
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }
 
-// displayResults exibe os resultados de forma organizada
+// displayResults usa o template compartilhado de resultados.
 func displayResults(results []HostResult, duration time.Duration) {
-	successCount := 0
-	failureCount := 0
-
-	for _, result := range results {
-		if result.Success {
-			successCount++
-		} else {
-			failureCount++
-		}
-
-		// Cabeçalho do host
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		if result.Success {
-			fmt.Printf("✅ Host: %s (Exit Code: %d)\n", result.Host, result.ExitCode)
-		} else {
-			fmt.Printf("❌ Host: %s (Exit Code: %d)\n", result.Host, result.ExitCode)
-		}
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-		// Exibe a saída
-		if result.Output != "" {
-			fmt.Print(result.Output)
-			// Garante que há uma nova linha no final se não houver
-			if result.Output[len(result.Output)-1] != '\n' {
-				fmt.Println()
-			}
-		}
-
-		// Exibe erro se houver
-		if result.Error != "" {
-			fmt.Printf("Erro: %s\n", result.Error)
-		}
-
-		fmt.Println()
-	}
-
-	// Resumo final
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("📊 Resumo: %d sucesso(s), %d falha(s), %d total | ⏱️  Tempo: %.2fs\n", successCount, failureCount, len(results), duration.Seconds())
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	writeCommandResults(os.Stdout, results, duration)
 }
 
 // ExecuteCommandWithOutput executa um comando remoto e retorna a saída

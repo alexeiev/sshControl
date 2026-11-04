@@ -314,6 +314,9 @@ sc cp up -r ./dist/ /var/www/html/ webserver
 # Com jump host e múltiplos hosts
 sc cp up -l app1 app2 -j prod-jump ./app.jar /opt/app/
 
+# Usuário de índice 1 e jump host de índice 2, antes do subcomando
+sc -j2 -u1 cp up /tmp/test.up 100.64.2.11
+
 # Usando tags
 sc cp up -l @web ./deploy.sh /opt/
 ```
@@ -326,6 +329,35 @@ sc cp up -l @web ./deploy.sh /opt/
 - `-a, --ask-password`: Solicita senha antes
 - `-P, --env-password`: Usa a senha da variável de ambiente `SCPW`
 - `-v, --verbose`: Modo debug (informações detalhadas da conexão)
+
+As flags de conexão (`-u`, `-j`, `-a`, `-P`, `-v` e `-i`) podem ser usadas antes ou depois do subcomando SSH. As opções próprias de cópia ficam após `cp`: `sc cp -r up ...`; `-l` deve ficar após `up`: `sc cp up -l ...`.
+
+Em `cp up`, `cp down` e `port-forward`, um IP ou hostname sem `usuario@` mantém o usuário escolhido por `-u`, por `default_user` ou pelo primeiro usuário configurado. Quando o destino inclui `usuario@host`, esse usuário explícito tem prioridade. No `tunnel`, `-u` sobrepõe o usuário do jump host.
+
+### Saída das operações
+
+Comandos remotos e transferências usam o mesmo template: cabeçalho da operação, detalhes do jump host quando usado, blocos com o usuário efetivamente utilizado em cada host, `✅` ou `❌` e resumo de sucessos, falhas e duração total. Comandos mostram o exit code; cópias mostram o tempo por host e o caminho transferido.
+
+```text
+🚀 Enviando /tmp/test.up para 2 host(s)
+   via Jump Host: backup-jump (ubuntu@192.168.1.203:22)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ User: ubuntu Host: 100.64.2.11 (Tempo: 0.8s)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Caminho: /tmp/test.up (46B)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ User: ubuntu Host: 100.64.2.12 (Tempo: 0.8s)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Caminho: /tmp/test.up (46B)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Resumo: 2 sucesso(s), 0 falha(s), 2 total | ⏱️  Tempo: 0.80s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+As cópias na CLI exibem os resultados ao terminar, sem linhas de progresso intercaladas. Comandos remotos únicos mantêm stdout e stderr em tempo real e mostram o relatório final em seguida. Sessões interativas e logs de tráfego continuam em tempo real; os painéis de port forwarding e tunnels usam os mesmos separadores.
 
 ### Verificação das chaves dos servidores SSH
 
@@ -1053,6 +1085,7 @@ VERSION=v1.1.0 make build
 
 O workflow `CI` executa três checks em pushes para `main` e em Pull Requests: testes Go, `golangci-lint` e `govulncheck`. As ferramentas são gratuitas e não precisam de conta ou token externo.
 
+- **Testes Go**: executa a suíte com o detector de condições de corrida (`-race`) e publica `coverage.out` no artefato `go-coverage`. Os testes de SFTP usam servidores locais e arquivos temporários; os testes da CLI verificam o usuário e a senha que chegam à autenticação SSH.
 - **golangci-lint v2.15.0**: usa as regras de `.golangci.yml` (`errcheck`, `govet`, `ineffassign`, `staticcheck` e `unused`). Cada execução disponibiliza o relatório JSON completo no artefato `golangci-lint-report`. Os apontamentos existentes continuam visíveis; novas ocorrências nas linhas alteradas fazem o check falhar, comparando com a base do PR ou com o commit anterior ao push.
 - **govulncheck v1.9.0**: consulta a base de vulnerabilidades do Go e falha quando encontra vulnerabilidades conhecidas alcançáveis pelo código. Também informa problemas em dependências que não parecem ser chamados pelo projeto.
 
@@ -1063,7 +1096,8 @@ O badge CodeQL mostra o status da execução na `main`; uma execução bem-suced
 Para executar localmente, use Go 1.26 com o patch mais recente e instale `golangci-lint` v2.15.0 pelos [binários oficiais](https://golangci-lint.run/docs/welcome/install/local/):
 
 ```bash
-go test ./...
+go test -race -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
 
 # Auditoria completa: retorna erro enquanto houver apontamentos existentes
 golangci-lint run

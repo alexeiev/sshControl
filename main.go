@@ -918,22 +918,16 @@ func runCpDown(cobraCmd *cobra.Command, args []string) {
 		Recursive:      cpRecursive,
 		Verbose:        verbose,
 		HostKeyOptions: cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
+		QuietProgress:  true,
 	}
 
-	fmt.Println()
-	fmt.Printf("Baixando %s de %s@%s...\n", remotePath, usernameToUse, hostname)
-	if selectedJumpHost != nil {
-		fmt.Printf("   via Jump Host: %s\n", selectedJumpHost.Name)
-	}
-	fmt.Println()
-
-	if err := ft.Download(sshConn); err != nil {
-		fmt.Fprintf(os.Stderr, "\nErro: %v\n", err)
+	cmd.PrintOperationHeader(fmt.Sprintf("Baixando %s de %s@%s", remotePath, usernameToUse, hostname), selectedJumpHost)
+	startTime := time.Now()
+	err = ft.Download(sshConn)
+	displaySingleTransferResult(usernameToUse, hostArg, localPath, time.Since(startTime), err)
+	if err != nil {
 		os.Exit(1)
 	}
-
-	fmt.Println()
-	fmt.Println("Download concluído!")
 }
 
 func runCpUp(cobraCmd *cobra.Command, args []string) {
@@ -1020,6 +1014,7 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		Recursive:      cpRecursive,
 		Verbose:        verbose,
 		HostKeyOptions: cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
+		QuietProgress:  true,
 	}
 
 	// Modo múltiplos hosts
@@ -1030,13 +1025,6 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Erro: %v\n", err)
 			os.Exit(1)
 		}
-
-		fmt.Println()
-		fmt.Printf("Enviando %s para %d host(s)...\n", localPath, len(hostArgs))
-		if selectedJumpHost != nil {
-			fmt.Printf("   via Jump Host: %s\n", selectedJumpHost.Name)
-		}
-		fmt.Println()
 
 		startTime := time.Now()
 		results := ft.UploadMultiple(cfg, hostArgs, effectiveUser, selectedJumpHost, password, askPassword)
@@ -1112,20 +1100,24 @@ func runCpUp(cobraCmd *cobra.Command, args []string) {
 		cmd.HostKeyOptions{IgnoreMismatch: ignoreHostKey},
 	)
 
-	fmt.Println()
-	fmt.Printf("Enviando %s para %s@%s:%s...\n", localPath, usernameToUse, hostname, remotePath)
-	if selectedJumpHost != nil {
-		fmt.Printf("   via Jump Host: %s\n", selectedJumpHost.Name)
-	}
-	fmt.Println()
-
-	if err := ft.Upload(sshConn); err != nil {
-		fmt.Fprintf(os.Stderr, "\nErro: %v\n", err)
+	cmd.PrintOperationHeader(fmt.Sprintf("Enviando %s para %s@%s:%s", localPath, usernameToUse, hostname, remotePath), selectedJumpHost)
+	startTime := time.Now()
+	err = ft.Upload(sshConn)
+	displaySingleTransferResult(usernameToUse, hostArg, localPath, time.Since(startTime), err)
+	if err != nil {
 		os.Exit(1)
 	}
+}
 
-	fmt.Println()
-	fmt.Println("Upload concluído!")
+// displaySingleTransferResult aplica o mesmo relatório do envio em lote.
+func displaySingleTransferResult(user, host, path string, duration time.Duration, transferErr error) {
+	result := cmd.TransferResult{User: user, Host: host, FilePath: path, Duration: duration, Success: transferErr == nil}
+	if transferErr != nil {
+		result.Error = transferErr.Error()
+	} else if info, err := os.Stat(path); err == nil && !info.IsDir() {
+		result.BytesSent = info.Size()
+	}
+	cmd.DisplayTransferResults([]cmd.TransferResult{result}, duration)
 }
 
 func runPortForward(cobraCmd *cobra.Command, args []string) {

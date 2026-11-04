@@ -335,6 +335,14 @@ func serveTestSSHConn(nConn net.Conn, cfg *ssh.ServerConfig) {
 	go ssh.DiscardRequests(reqs)
 
 	for newChan := range chans {
+		if newChan.ChannelType() == "session" {
+			channel, requests, err := newChan.Accept()
+			if err != nil {
+				continue
+			}
+			go serveTestCommandSession(channel, requests)
+			continue
+		}
 		if newChan.ChannelType() != "direct-tcpip" {
 			newChan.Reject(ssh.UnknownChannelType, "apenas direct-tcpip")
 			continue
