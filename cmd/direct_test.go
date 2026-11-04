@@ -106,3 +106,26 @@ func TestValidateHostFormat(t *testing.T) {
 		t.Fatal("expected invalid host format")
 	}
 }
+
+func TestParseConnectionStringDoesNotInventUser(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		input, user, host string
+		port              int
+	}{
+		{"100.64.2.11", "", "100.64.2.11", 22},
+		{"srv.internal:2222", "", "srv.internal", 2222},
+		{"deploy@100.64.2.11", "deploy", "100.64.2.11", 22},
+		{"deploy@srv.internal:2222", "deploy", "srv.internal", 2222},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			user, host, port, err := ParseConnectionString(tc.input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if user != tc.user || host != tc.host || port != tc.port {
+				t.Fatalf("obtido %q@%s:%d; esperado %q@%s:%d", user, host, port, tc.user, tc.host, tc.port)
+			}
+		})
+	}
+}

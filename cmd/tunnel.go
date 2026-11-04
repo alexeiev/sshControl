@@ -248,30 +248,29 @@ func (t *TunnelSession) RunForeground(stateDir string) error {
 		}
 	}()
 
-	fmt.Println("🔗 Conectando...")
-	fmt.Printf("   %s\n", t.SSHConn.formatConnectionString())
+	t.SSHConn.printConnectionHeader()
 	fmt.Println()
 
 	if err := t.open(); err != nil {
 		return err
 	}
 
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Printf("🧦 Tunnel SOCKS5 aberto via %s\n", t.Name)
 	fmt.Printf("   Configure o proxy SOCKS5 no navegador: %s\n", t.localAddress())
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Println()
 	fmt.Println("Pressione Ctrl+C para encerrar...")
 	fmt.Println()
 	fmt.Println("📋 Tráfego:")
-	fmt.Println("────────────────────────────────────────────────────────────────")
+	fmt.Println(outputSeparator)
 
 	reason, _ := t.serve()
 
 	fmt.Println()
-	fmt.Println("────────────────────────────────────────────────────────────────")
+	fmt.Println(outputSeparator)
 	t.printStats()
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Printf("🛑 Tunnel encerrado: %s\n", reason)
 	return nil
 }
@@ -429,8 +428,7 @@ func (t *TunnelSession) startDaemon(stateDir string, args []string) error {
 		result <- strings.TrimSpace(line)
 	}()
 
-	fmt.Println("🔗 Conectando...")
-	fmt.Printf("   %s\n", t.SSHConn.formatConnectionString())
+	t.SSHConn.printConnectionHeader()
 
 	var status string
 	select {
@@ -450,9 +448,9 @@ func (t *TunnelSession) startDaemon(stateDir string, args []string) error {
 
 	address := t.localAddress()
 	fmt.Println()
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Printf("🧦 Tunnel SOCKS5 aberto em background via %s\n", name)
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Printf("   Configure o proxy SOCKS5 no navegador: %s\n", address)
 	fmt.Printf("   Teste via terminal: curl --socks5-hostname %s https://ifconfig.me\n", address)
 	fmt.Println()
@@ -603,9 +601,9 @@ func PrintTunnelStatus(stateDir string) {
 	}
 
 	fmt.Println("🧦 Tunnels SOCKS5 ativos:")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Printf("%-20s %-20s %-8s %s\n", "Jump Host", "Proxy SOCKS5", "PID", "Rotas")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	for _, tn := range tunnels {
 		routes := "-"
 		if r := loadTunnelRoutes(stateDir, tn.Name); r != nil {
@@ -613,7 +611,7 @@ func PrintTunnelStatus(stateDir string) {
 		}
 		fmt.Printf("%-20s %-20s %-8d %s\n", tn.Name, fmt.Sprintf("localhost:%d", tn.Port), tn.PID, routes)
 	}
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Printf("Total: %d tunnel(s)\n", len(tunnels))
 	fmt.Println()
 }

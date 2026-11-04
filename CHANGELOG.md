@@ -7,10 +7,24 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-04
+
 ### Fixed
 
 - Corrige falsos alertas de chave SSH divergente ao compartilhar `known_hosts` com o OpenSSH: prioriza algoritmos já cadastrados para cada host e prefere Ed25519 em servidores novos, com alternativas ECDSA e RSA/SHA-2
 - Aplica a seleção de algoritmos separadamente ao destino e ao jump host, preservando entradas existentes e o bloqueio de chaves realmente alteradas
+- Corrige `-u, --user` e `default_user` em `cp up`, `cp down` e `port-forward`: destinos sem `usuario@` não substituem mais o usuário efetivo pelo usuário local da máquina
+
+### Added
+
+- Testes de flags curtas e longas, posições e combinações em subcomandos, rejeição de opções incompatíveis e autenticação SSH da CLI com usuário, senha de `SCPW` e jump host
+- Testes SFTP de upload e download, arquivos vazios, diretórios recursivos, envio para múltiplos hosts e transferência via jump host
+- Relatório de cobertura como artefato `go-coverage` na CI, com execução dos testes usando `-race`
+
+### Changed
+
+- Unifica os resultados de comandos remotos e transferências SFTP em um template único, com o usuário efetivo de cada host, indicadores de sucesso/falha e resumo com duração
+- Padroniza cabeçalhos com detalhes do jump host e separadores de conexões, port forwarding e tunnels; cópias na CLI apresentam o relatório final sem linhas de progresso intercaladas
 
 ## [1.2.0] - 2026-11-03
 
@@ -360,7 +374,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Correção do bug que pedia senha múltiplas vezes para usuários sem chave SSH
 - Correção no tratamento de Jump Hosts com múltiplas máquinas e usuários diferentes
 
-[Unreleased]: https://github.com/alexeiev/sshControl/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/alexeiev/sshControl/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/alexeiev/sshControl/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/alexeiev/sshControl/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/alexeiev/sshControl/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/alexeiev/sshControl/compare/v0.9.0...v1.0.0

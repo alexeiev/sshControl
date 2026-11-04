@@ -11,6 +11,7 @@ import (
 	"path"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alexeiev/sshControl/config"
 	"github.com/pkg/sftp"
@@ -46,10 +47,7 @@ func (s *SSHConnection) debugLog(format string, args ...interface{}) {
 // Connect estabelece uma conexão SSH interativa
 func (s *SSHConnection) Connect() error {
 	// Exibe a string de conexão antes de conectar
-	fmt.Println()
-	fmt.Println("🔗 Conectando...")
-	fmt.Printf("   %s\n", s.formatConnectionString())
-	fmt.Println()
+	s.printConnectionHeader()
 
 	s.debugLog("Iniciando conexão interativa")
 	s.debugLog("Usuário: %s", s.User)
@@ -112,13 +110,19 @@ func (s *SSHConnection) Connect() error {
 }
 
 // ExecuteCommand executa um comando remoto e exibe a saída
-func (s *SSHConnection) ExecuteCommand() error {
-	// Exibe a string de conexão e o comando antes de conectar
-	fmt.Println()
-	fmt.Println("🔗 Conectando...")
-	fmt.Printf("   %s\n", s.formatConnectionString())
-	fmt.Printf("   Comando: %s\n", s.Command)
-	fmt.Println()
+func (s *SSHConnection) ExecuteCommand() (resultErr error) {
+	PrintOperationHeader(fmt.Sprintf("Executando comando em 1 host(s): %s", s.Command), s.JumpHost)
+	startTime := time.Now()
+	exitCode := -1
+	defer func() {
+		result := HostResult{User: s.User, Host: s.Host, Success: resultErr == nil, ExitCode: exitCode}
+		if resultErr != nil {
+			result.Error = resultErr.Error()
+		}
+		// Se o comando terminou sem quebra de linha, separa o relatório da saída.
+		fmt.Println()
+		displayResults([]HostResult{result}, time.Since(startTime))
+	}()
 
 	s.debugLog("Iniciando execução de comando remoto")
 	s.debugLog("Usuário: %s", s.User)
@@ -162,11 +166,13 @@ func (s *SSHConnection) ExecuteCommand() error {
 	s.debugLog("Executando comando...")
 	if err := session.Run(s.Command); err != nil {
 		if exitErr, ok := err.(*ssh.ExitError); ok {
-			s.debugLog("Comando encerrado com exit code: %d", exitErr.ExitStatus())
-			return fmt.Errorf("comando encerrado com código: %d", exitErr.ExitStatus())
+			exitCode = exitErr.ExitStatus()
+			s.debugLog("Comando encerrado com exit code: %d", exitCode)
+			return fmt.Errorf("comando encerrado com código: %d", exitCode)
 		}
 		return fmt.Errorf("erro ao executar comando: %w", err)
 	}
+	exitCode = 0
 	s.debugLog("Comando executado com sucesso (exit code: 0)")
 
 	return nil

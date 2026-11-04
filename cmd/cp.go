@@ -15,6 +15,7 @@ import (
 
 // TransferResult armazena o resultado de uma transferência
 type TransferResult struct {
+	User      string
 	Host      string
 	Success   bool
 	FilePath  string
@@ -30,6 +31,7 @@ type FileTransfer struct {
 	Recursive      bool
 	Verbose        bool
 	HostKeyOptions HostKeyOptions
+	QuietProgress  bool // Agrupa a saída no relatório final, sem linhas de progresso.
 }
 
 // ProgressWriter implementa io.Writer para exibir progresso
@@ -209,16 +211,12 @@ func (ft *FileTransfer) downloadFile(sftpClient *sftp.Client, remotePath, localP
 	}
 	defer localFile.Close()
 
-	// Cria progress writer
-	pw := NewProgressWriter(filepath.Base(remotePath), hostLabel, remoteInfo.Size())
-
 	// Copia com progresso
-	_, err = io.Copy(io.MultiWriter(localFile, pw), remoteFile)
+	err = ft.copyWithProgress(localFile, remoteFile, filepath.Base(remotePath), hostLabel, remoteInfo.Size())
 	if err != nil {
 		return fmt.Errorf("erro ao copiar arquivo: %w", err)
 	}
 
-	pw.Finish()
 	return nil
 }
 
@@ -363,16 +361,25 @@ func (ft *FileTransfer) uploadFile(sftpClient *sftp.Client, localPath, remotePat
 	}
 	defer remoteFile.Close()
 
-	// Cria progress writer
-	pw := NewProgressWriter(filepath.Base(localPath), hostLabel, localInfo.Size())
-
 	// Copia com progresso
-	_, err = io.Copy(io.MultiWriter(remoteFile, pw), localFile)
+	err = ft.copyWithProgress(remoteFile, localFile, filepath.Base(localPath), hostLabel, localInfo.Size())
 	if err != nil {
 		return fmt.Errorf("erro ao copiar arquivo: %w", err)
 	}
 
-	pw.Finish()
+	return nil
+}
+
+func (ft *FileTransfer) copyWithProgress(destination io.Writer, source io.Reader, filename, host string, total int64) error {
+	if ft.QuietProgress {
+		_, err := io.Copy(destination, source)
+		return err
+	}
+	progress := NewProgressWriter(filename, host, total)
+	if _, err := io.Copy(io.MultiWriter(destination, progress), source); err != nil {
+		return err
+	}
+	progress.Finish()
 	return nil
 }
 
@@ -407,9 +414,10 @@ func (ft *FileTransfer) uploadDir(sftpClient *sftp.Client, localPath, remotePath
 		if entry.IsDir() {
 			// Para subdiretórios, passamos o caminho direto sem adicionar basename novamente
 			subFt := &FileTransfer{
-				LocalPath:  localEntryPath,
-				RemotePath: remoteEntryPath,
-				Recursive:  true,
+				LocalPath:     localEntryPath,
+				RemotePath:    remoteEntryPath,
+				Recursive:     true,
+				QuietProgress: ft.QuietProgress,
 			}
 			if err := subFt.uploadDirRecursive(sftpClient, localEntryPath, remoteEntryPath, hostLabel); err != nil {
 				return err
@@ -481,6 +489,8 @@ func (ft *FileTransfer) UploadMultiple(cfg *config.ConfigFile, hostArgs []string
 		}
 	}
 
+	PrintOperationHeader(fmt.Sprintf("Enviando %s para %d host(s)", ft.LocalPath, len(expandedHosts)), jumpHost)
+
 	results := make(chan TransferResult, len(expandedHosts))
 	var wg sync.WaitGroup
 
@@ -530,6 +540,7 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 		host, err := parseDirectConnection(hostArg, effectiveUser)
 		if err != nil {
 			return TransferResult{
+				User:    username,
 				Host:    hostArg,
 				Success: false,
 				Error:   fmt.Sprintf("Formato inválido: %v", err),
@@ -580,6 +591,7 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 	localInfo, err := os.Stat(ft.LocalPath)
 	if err != nil {
 		return TransferResult{
+			User:    username,
 			Host:    hostArg,
 			Success: false,
 			Error:   fmt.Sprintf("Erro ao acessar arquivo local: %v", err),
@@ -587,11 +599,15 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 	}
 
 	// Executa o upload
-	err = ft.Upload(sshConn)
+	// Cada goroutine tem sua cópia; os resultados são apresentados em conjunto.
+	transfer := *ft
+	transfer.QuietProgress = true
+	err = transfer.Upload(sshConn)
 	duration := time.Since(startTime)
 
 	if err != nil {
 		return TransferResult{
+			User:     username,
 			Host:     hostArg,
 			Success:  false,
 			Error:    err.Error(),
@@ -599,35 +615,21 @@ func (ft *FileTransfer) uploadToHost(cfg *config.ConfigFile, hostArg string, eff
 		}
 	}
 
+	var bytesSent int64
+	if !localInfo.IsDir() {
+		bytesSent = localInfo.Size()
+	}
 	return TransferResult{
+		User:      username,
 		Host:      hostArg,
 		Success:   true,
 		FilePath:  ft.LocalPath,
-		BytesSent: localInfo.Size(),
+		BytesSent: bytesSent,
 		Duration:  duration,
 	}
 }
 
-// DisplayTransferResults exibe os resultados das transferências
+// DisplayTransferResults usa o mesmo template dos comandos remotos.
 func DisplayTransferResults(results []TransferResult, totalDuration time.Duration) {
-	successCount := 0
-	failureCount := 0
-
-	fmt.Println()
-	fmt.Println("------------------------------------------------------------------------------------")
-
-	for _, result := range results {
-		if result.Success {
-			successCount++
-			fmt.Printf(" Host: %s (%.1fs)\n", result.Host, result.Duration.Seconds())
-		} else {
-			failureCount++
-			fmt.Printf(" Host: %s - Erro: %s\n", result.Host, result.Error)
-		}
-	}
-
-	fmt.Println("------------------------------------------------------------------------------------")
-	fmt.Printf(" Resumo: %d sucesso(s), %d falha(s), %d total | Tempo: %.2fs\n",
-		successCount, failureCount, len(results), totalDuration.Seconds())
-	fmt.Println("------------------------------------------------------------------------------------")
+	writeTransferResults(os.Stdout, results, totalDuration)
 }

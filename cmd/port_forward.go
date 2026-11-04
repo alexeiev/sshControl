@@ -47,10 +47,7 @@ func NewPortForwardSession(sshConn *SSHConnection, forward PortForward) *PortFor
 // Start inicia o port forwarding
 func (pf *PortForwardSession) Start() error {
 	// Exibe informações de conexão
-	fmt.Println()
-	fmt.Println("🔗 Conectando...")
-	fmt.Printf("   %s\n", pf.SSHConn.formatConnectionString())
-	fmt.Println()
+	PrintOperationHeader(fmt.Sprintf("Encaminhando porta %d para %s:%d via %s@%s:%d", pf.Forward.LocalPort, pf.Forward.RemoteHost, pf.Forward.RemotePort, pf.SSHConn.User, pf.SSHConn.Host, pf.SSHConn.Port), pf.SSHConn.JumpHost)
 
 	pf.SSHConn.debugLog("Iniciando port forward: local %d -> remoto %s:%d", pf.Forward.LocalPort, pf.Forward.RemoteHost, pf.Forward.RemotePort)
 
@@ -81,16 +78,16 @@ func (pf *PortForwardSession) Start() error {
 	pf.SSHConn.debugLog("Listener local criado com sucesso")
 
 	// Exibe informações do tunnel
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Printf("🚇 Port Forward Ativo\n")
 	fmt.Printf("   Local:  0.0.0.0:%d\n", pf.Forward.LocalPort)
 	fmt.Printf("   Remoto: %s:%d (via %s)\n", pf.Forward.RemoteHost, pf.Forward.RemotePort, pf.SSHConn.Host)
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Println()
 	fmt.Println("Pressione Ctrl+C para encerrar...")
 	fmt.Println()
 	fmt.Println("📋 Log de conexões:")
-	fmt.Println("────────────────────────────────────────────────────────────────")
+	fmt.Println(outputSeparator)
 
 	// Configura handler para Ctrl+C
 	sigChan := make(chan os.Signal, 1)
@@ -204,12 +201,12 @@ func (pf *PortForwardSession) handleConnection(localConn net.Conn, connNum int64
 // Stop encerra a sessão de port forwarding
 func (pf *PortForwardSession) Stop() {
 	fmt.Println()
-	fmt.Println("────────────────────────────────────────────────────────────────")
+	fmt.Println(outputSeparator)
 	fmt.Printf("📊 Estatísticas da sessão:\n")
 	fmt.Printf("   Total de conexões: %d\n", atomic.LoadInt64(&pf.totalConns))
 	fmt.Printf("   Bytes enviados:    %s\n", formatBytes(atomic.LoadInt64(&pf.bytesSent)))
 	fmt.Printf("   Bytes recebidos:   %s\n", formatBytes(atomic.LoadInt64(&pf.bytesReceived)))
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println(outputSeparator)
 	fmt.Println()
 	fmt.Println("🛑 Port forward encerrado.")
 
@@ -220,4 +217,3 @@ func (pf *PortForwardSession) Stop() {
 		pf.client.Close()
 	}
 }
-

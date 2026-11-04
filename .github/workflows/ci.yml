@@ -28,7 +28,14 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Run tests
-        run: go test ./...
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Publicar cobertura dos testes
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-coverage
+          path: coverage.out
+          if-no-files-found: error
 
   lint:
     name: Golangci-lint
