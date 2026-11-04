@@ -331,6 +331,8 @@ sc cp up -l @web ./deploy.sh /opt/
 
 O sshControl valida a identidade dos servidores e dos jump hosts usando `~/.ssh/known_hosts`, no formato OpenSSH. Esse arquivo é compartilhado com o SSH convencional e permanece no mesmo caminho quando `SCCONFIG` aponta para outro YAML.
 
+Na negociação da chave, prioriza os algoritmos já cadastrados para aquele host. Para servidores novos, prefere Ed25519, com alternativas ECDSA e RSA/SHA-2 quando necessário, seguindo a preferência do OpenSSH entre os algoritmos suportados. Assim, entradas Ed25519 criadas pelo OpenSSH e entradas ECDSA já salvas pelo `sc` continuam válidas. A escolha é independente para o destino e para o jump host.
+
 - Chave conhecida: conecta normalmente.
 - Servidor desconhecido: aceita e salva a chave automaticamente, exibindo seu fingerprint. Funciona também sem terminal, em execução ou upload em lote e em túneis em background.
 - Chave diferente da cadastrada: recusa a conexão por padrão.

@@ -249,11 +249,16 @@ func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientC
 	if err != nil {
 		return nil, err
 	}
+	hostKeyAlgorithms, err := s.hostKeyAlgorithms(net.JoinHostPort(s.Host, fmt.Sprint(s.Port)))
+	if err != nil {
+		return nil, err
+	}
 
 	config := &ssh.ClientConfig{
-		User:            s.User,
-		Auth:            authMethods,
-		HostKeyCallback: hostKeyCallback,
+		User:              s.User,
+		Auth:              authMethods,
+		HostKeyCallback:   hostKeyCallback,
+		HostKeyAlgorithms: hostKeyAlgorithms,
 	}
 
 	return config, nil
@@ -261,7 +266,7 @@ func (s *SSHConnection) createSSHConfigWithContext(context string) (*ssh.ClientC
 
 // dial conecta ao host (via Jump Host se necessário)
 func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
-	address := fmt.Sprintf("%s:%d", s.Host, s.Port)
+	address := net.JoinHostPort(s.Host, fmt.Sprint(s.Port))
 
 	// Conexão direta se não usar Jump Host
 	if s.JumpHost == nil {
@@ -285,14 +290,19 @@ func (s *SSHConnection) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 	}
 
 	// Cria configuração separada para Jump Host
+	jumpAddress := net.JoinHostPort(s.JumpHost.Host, fmt.Sprint(s.JumpHost.Port))
+	jumpHostKeyAlgorithms, err := s.hostKeyAlgorithms(jumpAddress)
+	if err != nil {
+		return nil, err
+	}
 	jumpConfig := &ssh.ClientConfig{
-		User:            s.JumpHost.User,
-		Auth:            jumpAuthMethods,
-		HostKeyCallback: hostKeyCallback,
+		User:              s.JumpHost.User,
+		Auth:              jumpAuthMethods,
+		HostKeyCallback:   hostKeyCallback,
+		HostKeyAlgorithms: jumpHostKeyAlgorithms,
 	}
 
 	// Conecta ao Jump Host
-	jumpAddress := fmt.Sprintf("%s:%d", s.JumpHost.Host, s.JumpHost.Port)
 	s.debugLog("Conectando ao Jump Host %s...", jumpAddress)
 	jumpClient, err := ssh.Dial("tcp", jumpAddress, jumpConfig)
 	if err != nil {

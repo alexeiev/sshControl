@@ -7,6 +7,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrige falsos alertas de chave SSH divergente ao compartilhar `known_hosts` com o OpenSSH: prioriza algoritmos já cadastrados para cada host e prefere Ed25519 em servidores novos, com alternativas ECDSA e RSA/SHA-2
+- Aplica a seleção de algoritmos separadamente ao destino e ao jump host, preservando entradas existentes e o bloqueio de chaves realmente alteradas
+
 ## [1.2.0] - 2026-11-03
 
 ### Added

@@ -280,16 +280,19 @@ func freePort(t *testing.T) int {
 }
 
 // startTestSSHServer inicia um servidor SSH mínimo com suporte a direct-tcpip
-func startTestSSHServer(t *testing.T, user, password string) (string, ssh.PublicKey) {
+func startTestSSHServer(t *testing.T, user, password string, signers ...ssh.Signer) (string, ssh.PublicKey) {
 	t.Helper()
 
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatalf("erro ao gerar chave do servidor: %v", err)
-	}
-	signer, err := ssh.NewSignerFromKey(priv)
-	if err != nil {
-		t.Fatalf("erro ao criar signer: %v", err)
+	if len(signers) == 0 {
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatalf("erro ao gerar chave do servidor: %v", err)
+		}
+		signer, err := ssh.NewSignerFromKey(priv)
+		if err != nil {
+			t.Fatalf("erro ao criar signer: %v", err)
+		}
+		signers = append(signers, signer)
 	}
 
 	cfg := &ssh.ServerConfig{
@@ -300,7 +303,9 @@ func startTestSSHServer(t *testing.T, user, password string) (string, ssh.Public
 			return nil, errors.New("senha incorreta")
 		},
 	}
-	cfg.AddHostKey(signer)
+	for _, signer := range signers {
+		cfg.AddHostKey(signer)
+	}
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -318,7 +323,7 @@ func startTestSSHServer(t *testing.T, user, password string) (string, ssh.Public
 		}
 	}()
 
-	return ln.Addr().String(), signer.PublicKey()
+	return ln.Addr().String(), signers[0].PublicKey()
 }
 
 func serveTestSSHConn(nConn net.Conn, cfg *ssh.ServerConfig) {
