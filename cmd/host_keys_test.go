@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"net"
 	"os"
 	"path/filepath"
@@ -15,6 +18,164 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+func TestHostKeyAlgorithmNegotiation(t *testing.T) {
+	t.Parallel()
+	_, edKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edSigner, err := ssh.NewSignerFromKey(edKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecSigner, err := ssh.NewSignerFromKey(ecKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsaSigner, err := ssh.NewSignerFromKey(rsaKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyRSA, err := ssh.NewSignerWithAlgorithms(rsaSigner.(ssh.AlgorithmSigner), []string{ssh.KeyAlgoRSA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate := &ssh.Certificate{
+		Key:             edSigner.PublicKey(),
+		CertType:        ssh.HostCert,
+		ValidPrincipals: []string{"127.0.0.1"},
+		ValidBefore:     ssh.CertTimeInfinity,
+	}
+	if err := certificate.SignCert(rand.Reader, rsaSigner); err != nil {
+		t.Fatal(err)
+	}
+	certSigner, err := ssh.NewCertSigner(certificate, edSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name          string
+		known         ssh.PublicKey
+		marker        string
+		hashed        bool
+		serverSigners []ssh.Signer
+		jumpECDSA     bool
+		want          string
+		wantReject    bool
+	}{
+		{name: "novo servidor prefere Ed25519", want: ssh.KeyAlgoED25519},
+		{name: "entrada Ed25519 do OpenSSH", known: edSigner.PublicKey(), want: ssh.KeyAlgoED25519},
+		{name: "entrada Ed25519 com hash", known: edSigner.PublicKey(), hashed: true, want: ssh.KeyAlgoED25519},
+		{name: "entrada ECDSA existente do sc", known: ecSigner.PublicKey(), want: ssh.KeyAlgoECDSA521},
+		{name: "entrada RSA existente usa SHA-2", known: rsaSigner.PublicKey(), want: ssh.KeyAlgoRSA},
+		{name: "servidor somente ECDSA", serverSigners: []ssh.Signer{ecSigner}, want: ssh.KeyAlgoECDSA521},
+		{name: "servidor somente RSA", serverSigners: []ssh.Signer{rsaSigner}, want: ssh.KeyAlgoRSA},
+		{name: "compatibilidade RSA legado preservada", serverSigners: []ssh.Signer{legacyRSA}, want: ssh.KeyAlgoRSA},
+		{name: "destino Ed25519 e jump ECDSA", known: edSigner.PublicKey(), jumpECDSA: true, want: ssh.KeyAlgoED25519},
+		{name: "certificado mantém prioridade com CA", known: rsaSigner.PublicKey(), marker: "@cert-authority ", serverSigners: []ssh.Signer{ecSigner, edSigner, certSigner}, want: ssh.CertAlgoED25519v01},
+		{name: "Ed25519 alterada continua bloqueada", known: testHostKey(t), wantReject: true},
+	} {
+		for _, viaJump := range []bool{false, true} {
+			if tc.jumpECDSA && !viaJump {
+				continue
+			}
+			t.Run(tc.name+"/jump="+strconv.FormatBool(viaJump), func(t *testing.T) {
+				signers := tc.serverSigners
+				if len(signers) == 0 {
+					signers = []ssh.Signer{ecSigner, edSigner, rsaSigner}
+				}
+				target, _ := startTestSSHServer(t, "user", "secret", signers...)
+				addresses := []string{target}
+				var jumpHost *config.JumpHost
+				if viaJump {
+					jump, _ := startTestSSHServer(t, "user", "secret", signers...)
+					addresses = append(addresses, jump)
+					host, portText, err := net.SplitHostPort(jump)
+					if err != nil {
+						t.Fatal(err)
+					}
+					port, err := strconv.Atoi(portText)
+					if err != nil {
+						t.Fatal(err)
+					}
+					jumpHost = &config.JumpHost{Name: "jump", Host: host, Port: port, User: "user"}
+				}
+				filename := filepath.Join(t.TempDir(), "known_hosts")
+				var original []byte
+				if tc.known != nil {
+					for _, address := range addresses {
+						known := tc.known
+						if tc.jumpECDSA && address != target {
+							known = ecSigner.PublicKey()
+						}
+						if tc.hashed {
+							address = knownhosts.HashHostname(knownhosts.Normalize(address))
+						}
+						original = append(original, tc.marker+knownhosts.Line([]string{address}, known)+"\n"...)
+					}
+					if err := os.WriteFile(filename, original, 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				host, portText, err := net.SplitHostPort(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				port, err := strconv.Atoi(portText)
+				if err != nil {
+					t.Fatal(err)
+				}
+				connection := NewSSHConnection("user", host, port, nil, "secret", jumpHost, nil, "", false, "", 0, false, HostKeyOptions{KnownHostsFile: filename})
+				connection.InteractivePasswordAllowed = false
+				cfg, err := connection.createSSHConfig()
+				if err != nil {
+					t.Fatal(err)
+				}
+				check := cfg.HostKeyCallback
+				cfg.HostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+					if !tc.wantReject && key.Type() != tc.want {
+						t.Errorf("algoritmo negociado = %s; esperado %s", key.Type(), tc.want)
+					}
+					return check(hostname, remote, key)
+				}
+				client, err := connection.dial(cfg)
+				if tc.wantReject {
+					if err == nil {
+						_ = client.Close()
+						t.Fatal("chave alterada aceita")
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("negociação recusou chave legítima: %v", err)
+				}
+				if err := client.Close(); err != nil {
+					t.Fatal(err)
+				}
+				data, err := os.ReadFile(filename)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.known != nil && string(data) != string(original) {
+					t.Fatal("negociação alterou entrada existente")
+				}
+				if tc.known == nil && strings.Count(string(data), " "+tc.want+" ") != len(addresses) {
+					t.Fatalf("algoritmo cadastrado inesperado: %s", data)
+				}
+			})
+		}
+	}
+}
 
 func testHostKey(t *testing.T) ssh.PublicKey {
 	t.Helper()
